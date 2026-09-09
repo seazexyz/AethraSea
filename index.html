@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AethraSea — High-Performance Folia Server Engine</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                        },
+                        dark: {
+                            bg: '#090d14',
+                            card: '#0f172a',
+                            subtle: '#1e293b',
+                            border: 'rgba(255, 255, 255, 0.08)',
+                            hover: 'rgba(255, 255, 255, 0.12)'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #080c14;
+            color: #e2e8f0;
+        }
+
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .border-subtle {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .border-subtle-hover:hover {
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080c14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #10b981;
+        }
+
+        .blur-gradient {
+            background: radial-gradient(circle at 50% -20%, rgba(16, 185, 129, 0.15), transparent 70%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-slate-950">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-16 opacity-0 transition-all duration-300 pointer-events-none px-4 py-2.5 rounded-lg bg-brand-500 text-slate-950 font-medium text-xs shadow-xl flex items-center gap-2">
+        <i class="fa-solid fa-check-circle text-sm"></i>
+        <span id="toast-msg">Copied to clipboard</span>
+    </div>
+
+    <!-- Navigation Bar -->
+    <header class="sticky top-0 z-40 bg-[#080c14]/80 backdrop-blur-md border-b border-subtle">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+            
+            <!-- Logo & Brand -->
+            <a href="#home" onclick="navigate('home')" class="flex items-center gap-2.5 font-semibold text-sm">
+                <div class="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-500">
+                    <i class="fa-solid fa-layer-group text-xs"></i>
+                </div>
+                <span class="text-white font-bold tracking-tight">AethraSea</span>
+                <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-800/80 text-zinc-400 font-normal border border-white/5 font-mono">v26.2</span>
+            </a>
+
+            <!-- Central Nav Tabs -->
+            <nav class="hidden md:flex items-center gap-1 text-xs font-medium text-slate-300">
+                <button onclick="navigate('home')" id="nav-home" class="px-3 py-1.5 rounded-md hover:text-white transition-colors text-white bg-slate-800/50">Home</button>
+                <button onclick="navigate('download')" id="nav-download" class="px-3 py-1.5 rounded-md hover:text-white transition-colors text-slate-400">Download</button>
+                <button onclick="navigate('docs')" id="nav-docs" class="px-3 py-1.5 rounded-md hover:text-white transition-colors text-slate-400">Docs</button>
+            </nav>
+
+            <!-- Quick Search & GitHub -->
+            <div class="flex items-center gap-2.5">
+                <button onclick="openSearchModal()" class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-subtle text-slate-400 text-xs hover:border-slate-700 transition-colors">
+                    <i class="fa-solid fa-magnifying-glass text-[11px]"></i>
+                    <span>Search docs...</span>
+                    <kbd class="px-1.5 py-0.5 text-[10px] bg-slate-800 rounded border border-white/10 text-slate-400 font-mono">⌘K</kbd>
+                </button>
+
+                <a href="https://github.com/seazexyz/AethraSea" target="_blank" rel="noopener" class="p-2 text-slate-400 hover:text-white transition-colors text-sm" title="GitHub Repository">
+                    <i class="fa-brands fa-github text-base"></i>
+                </a>
+
+                <button onclick="toggleMobileMenu()" class="md:hidden p-2 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Dropdown Menu -->
+        <div id="mobile-menu" class="hidden md:hidden border-b border-subtle bg-dark-bg px-4 py-3 space-y-2 text-xs font-medium">
+            <button onclick="navigate('home'); toggleMobileMenu();" class="block w-full text-left py-1.5 text-slate-300">Home</button>
+            <button onclick="navigate('download'); toggleMobileMenu();" class="block w-full text-left py-1.5 text-slate-300">Download</button>
+            <button onclick="navigate('docs'); toggleMobileMenu();" class="block w-full text-left py-1.5 text-slate-300">Docs</button>
+            <button onclick="openSearchModal(); toggleMobileMenu();" class="block w-full text-left py-1.5 text-brand-500">Search Documentation</button>
+        </div>
+    </header>
+
+    <main class="flex-grow">
+        
+        <!-- ================================================================= -->
+        <!-- VIEW 1: HOME PAGE (seadomine.com) -->
+        <!-- ================================================================= -->
+        <div id="view-home" class="blur-gradient">
+            
+            <!-- Hero Section -->
+            <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+                <div class="grid lg:grid-cols-12 gap-12 items-center">
+                    
+                    <!-- Left Hero Intro -->
+                    <div class="lg:col-span-7 space-y-6">
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-500 text-xs font-medium">
+                            <i class="fa-solid fa-leaf text-xs"></i>
+                            <span>Folia 26.2 Core Fork</span>
+                        </div>
+
+                        <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white leading-tight">
+                            Regionized multithreading <br class="hidden sm:inline"> engineered for <span class="text-brand-500 italic font-normal">performance</span>.
+                        </h1>
+
+                        <p class="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl">
+                            AethraSea extends Folia's architecture with parallel Moonrise chunk processing, asynchronous pathfinding threads, and built-in packet security.
+                        </p>
+
+                        <!-- Action CTAs -->
+                        <div class="flex flex-wrap items-center gap-3 pt-2">
+                            <button onclick="navigate('docs')" class="px-5 py-2.5 rounded-md bg-brand-500 hover:bg-brand-600 text-slate-950 font-medium text-xs transition-colors flex items-center gap-2">
+                                <span>Get Started</span>
+                                <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                            </button>
+                            <button onclick="navigate('download')" class="px-5 py-2.5 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-200 border border-subtle text-xs transition-colors">
+                                Download Binary
+                            </button>
+                        </div>
+
+                        <!-- Minimal Stats Bar -->
+                        <div class="pt-6 border-t border-subtle flex flex-wrap gap-8 text-xs text-slate-400">
+                            <div>
+                                <span class="font-bold text-white code-font">26.2</span>
+                                <span class="block text-[11px] text-slate-500">Target Core Version</span>
+                            </div>
+                            <div>
+                                <span class="font-bold text-white code-font">JDK 21+</span>
+                                <span class="block text-[11px] text-slate-500">Required Runtime</span>
+                            </div>
+                            <div>
+                                <span class="font-bold text-white code-font">dev.folia.sea</span>
+                                <span class="block text-[11px] text-slate-500">Isolated Package</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Code/Terminal Box (Leaf Minimalist Style) -->
+                    <div class="lg:col-span-5">
+                        <div class="rounded-xl border border-subtle bg-dark-card overflow-hidden shadow-2xl">
+                            <!-- Window Header -->
+                            <div class="px-4 py-3 bg-slate-950/60 border-b border-subtle flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+                                    <div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+                                    <div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+                                    <span class="text-[11px] code-font text-slate-400 ml-2">sea.yml</span>
+                                </div>
+                                <span class="text-[10px] code-font px-2 py-0.5 rounded bg-brand-500/10 text-brand-500 border border-brand-500/20">CONFIG SPEC</span>
+                            </div>
+
+                            <!-- Config Preview Text -->
+                            <div class="p-4 code-font text-xs leading-relaxed text-slate-300 overflow-x-auto bg-[#070a10]">
+<pre><code class="text-slate-400">performance:
+  smart-region-merging: <span class="text-brand-500">true</span>
+  async-chunk-io: <span class="text-brand-500">true</span>
+  async-pathfinding: <span class="text-brand-500">true</span>
+  pathfinding-threads: <span class="text-amber-400">4</span>
+  chunk-system:
+    parallel-chunk-loading: <span class="text-brand-500">true</span>
+    chunk-loading-parallelism: <span class="text-amber-400">0</span>
+
+network:
+  packet-flood-limiter: <span class="text-brand-500">true</span>
+  max-packets-per-second: <span class="text-amber-400">500</span></code></pre>
+                            </div>
+                            <div class="px-4 py-2 bg-slate-950/40 border-t border-subtle text-[11px] text-slate-500 flex justify-between font-mono">
+                                <span>Default Engine Profile</span>
+                                <a href="#docs" onclick="navigate('docs')" class="text-brand-500 hover:underline">View Full Spec →</a>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Minimal Features Grid ("What You Get") -->
+            <section class="border-t border-subtle py-16 bg-slate-950/30">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    
+                    <div class="mb-10 max-w-2xl space-y-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-brand-500">Engine Pillars</span>
+                        <h2 class="text-xl sm:text-2xl font-semibold text-white">Designed for high entity & chunk density</h2>
+                    </div>
+
+                    <div class="grid md:grid-cols-3 gap-6">
+                        
+                        <!-- Feature 1 -->
+                        <div class="p-6 rounded-xl bg-dark-card border border-subtle border-subtle-hover transition-all space-y-3">
+                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-500 text-sm">
+                                <i class="fa-solid fa-microchip"></i>
+                            </div>
+                            <h3 class="text-sm font-bold text-white">Parallel Moonrise Engine</h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                Offloads world generation and chunk disk access directly onto dedicated worker thread pools without blocking tick threads.
+                            </p>
+                        </div>
+
+                        <!-- Feature 2 -->
+                        <div class="p-6 rounded-xl bg-dark-card border border-subtle border-subtle-hover transition-all space-y-3">
+                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-500 text-sm">
+                                <i class="fa-solid fa-route"></i>
+                            </div>
+                            <h3 class="text-sm font-bold text-white">Async Pathfinding Pool</h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                Mob navigation computations are shifted out of region tick loops, preventing lag spikes in heavily populated mob farms.
+                            </p>
+                        </div>
+
+                        <!-- Feature 3 -->
+                        <div class="p-6 rounded-xl bg-dark-card border border-subtle border-subtle-hover transition-all space-y-3">
+                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-500 text-sm">
+                                <i class="fa-solid fa-shield-halved"></i>
+                            </div>
+                            <h3 class="text-sm font-bold text-white">Netty Packet Pipeline</h3>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                Filters incoming packet floods and validates sign/book payloads before dispatching to target world region workers.
+                            </p>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+        </div>
+
+
+        <!-- ================================================================= -->
+        <!-- VIEW 2: DOWNLOAD PAGE (seadomine.com/download) -->
+        <!-- ================================================================= -->
+        <div id="view-download" class="hidden py-12 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="space-y-3 mb-8">
+                <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-mono">
+                    <i class="fa-solid fa-download text-brand-500"></i>
+                    <span>Official Release Binaries</span>
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-semibold text-white">Download AethraSea Core</h1>
+                <p class="text-slate-400 text-xs sm:text-sm">Pre-compiled Paperclip executable jar files for direct production deployment.</p>
+            </div>
+
+            <!-- Download Cards -->
+            <div class="grid md:grid-cols-2 gap-6">
+                
+                <!-- Main Release Card -->
+                <div class="p-6 rounded-xl bg-dark-card border border-subtle space-y-5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-brand-500 font-mono">STABLE RELEASE</span>
+                        <span class="text-[11px] text-slate-500 font-mono">Folia 26.2 Base</span>
+                    </div>
+
+                    <div>
+                        <h3 class="text-base font-bold text-white">aethrasea-paperclip-26.2.jar</h3>
+                        <p class="text-xs text-slate-400 mt-1">Full distribution jar containing patched server core and libraries.</p>
+                    </div>
+
+                    <div class="p-3 rounded bg-slate-950 border border-subtle text-[11px] code-font text-slate-400 space-y-1">
+                        <div>Size: ~64.8 MB</div>
+                        <div>Target Java: JDK 21 / 22</div>
+                        <div class="text-slate-500 truncate">SHA-256: 8f2a10b49c...e81c</div>
+                    </div>
+
+                    <a href="https://github.com/seazexyz/AethraSea/releases" target="_blank" rel="noopener" class="w-full py-2.5 rounded bg-brand-500 hover:bg-brand-600 text-slate-950 font-semibold text-xs transition-colors flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Download Jar Binary</span>
+                    </a>
+                </div>
+
+                <!-- Source / Self Build Option -->
+                <div class="p-6 rounded-xl bg-dark-card border border-subtle space-y-5 flex flex-col justify-between">
+                    <div class="space-y-3">
+                        <span class="text-xs font-semibold text-slate-400 font-mono">SOURCE COMPILATION</span>
+                        <h3 class="text-base font-bold text-white">Build from GitHub Source</h3>
+                        <p class="text-xs text-slate-400">Clone the repository and compile using standard Gradle tasks on your server environment.</p>
+                        
+                        <div class="p-3 rounded bg-slate-950 border border-subtle text-[11px] code-font text-slate-300">
+                            <code>./gradlew createPaperclipJar</code>
+                        </div>
+                    </div>
+
+                    <a href="https://github.com/seazexyz/AethraSea" target="_blank" rel="noopener" class="w-full py-2.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-200 border border-subtle text-xs transition-colors flex items-center justify-center gap-2">
+                        <i class="fa-brands fa-github"></i>
+                        <span>GitHub Repository</span>
+                    </a>
+                </div>
+
+            </div>
+
+            <!-- Notes -->
+            <div class="mt-8 p-4 rounded-lg bg-slate-900/50 border border-subtle text-xs text-slate-400 space-y-1">
+                <span class="font-bold text-slate-200"><i class="fa-solid fa-circle-info text-brand-500 mr-1.5"></i> Deployment Notice:</span>
+                <p>When upgrading server jar binaries, remember to remove the local <code class="text-brand-500 code-font">versions/</code> directory to force Paperclip to extract updated patch hashes.</p>
+            </div>
+        </div>
+
+
+        <!-- ================================================================= -->
+        <!-- VIEW 3: DOCUMENTATION PAGE (seadomine.com/docs) -->
+        <!-- ================================================================= -->
+        <div id="view-docs" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid lg:grid-cols-12 gap-8 items-start">
+                
+                <!-- Docs Sidebar Navigation -->
+                <aside class="lg:col-span-3 space-y-6 sticky top-20">
+                    <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Documentation</div>
+
+                    <nav class="space-y-4 text-xs font-medium">
+                        <!-- Group 1: Introduction -->
+                        <div class="space-y-1">
+                            <div class="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Introduction</div>
+                            <button onclick="showDocSection('docs-getting-started', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-500 border border-brand-500/20">Getting Started</button>
+                            <button onclick="showDocSection('docs-faq', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">Frequently Asked Questions</button>
+                            <button onclick="showDocSection('docs-useful-sites', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">Useful Websites</button>
+                        </div>
+
+                        <!-- Group 2: Configuration -->
+                        <div class="space-y-1">
+                            <div class="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Configuration</div>
+                            <button onclick="showDocSection('docs-config', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">sea.yml Specification</button>
+                            <button onclick="showDocSection('docs-jvm-flags', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">JVM Flags & Tuning</button>
+                        </div>
+
+                        <!-- Group 3: Architecture & Diagnostics -->
+                        <div class="space-y-1">
+                            <div class="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Architecture</div>
+                            <button onclick="showDocSection('docs-architecture', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">Internal Package Specs</button>
+                            <button onclick="showDocSection('docs-hud', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">HUD & GUI Diagnostics</button>
+                        </div>
+
+                        <!-- Group 4: Development -->
+                        <div class="space-y-1">
+                            <div class="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Development</div>
+                            <button onclick="showDocSection('docs-build', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">Gradle Build Workflow</button>
+                            <button onclick="showDocSection('docs-api-guide', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">API Usage Guide</button>
+                        </div>
+                    </nav>
+
+                    <div class="p-3 rounded-lg bg-slate-900 border border-subtle text-[11px] text-slate-400 space-y-1">
+                        <span class="font-bold text-slate-200">Folia Parity</span>
+                        <p>AethraSea maintains 100% API parity with Paper & Folia plugin ecosystems.</p>
+                    </div>
+                </aside>
+
+                <!-- Docs Main Content Panel -->
+                <div class="lg:col-span-9 bg-dark-card border border-subtle rounded-xl p-6 sm:p-8 min-h-[600px]">
+                    
+                    <!-- Section 1: Getting Started -->
+                    <div id="docs-getting-started" class="doc-content space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / getting-started</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">Getting Started with AethraSea</h1>
+                            <p class="text-xs text-slate-400 mt-1">Quick installation guide and core deployment overview.</p>
+                        </div>
+
+                        <!-- Callout Box (Leaf Style) -->
+                        <div class="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-start gap-3">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400 text-base mt-0.5"></i>
+                            <div class="space-y-1 text-xs">
+                                <span class="font-bold text-amber-400 uppercase tracking-wide">Work in Progress</span>
+                                <p class="text-slate-300 leading-relaxed">
+                                    This documentation site is under active development. For live support or technical queries, feel free to join our community channels on Discord or QQ.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 text-xs text-slate-300 leading-relaxed">
+                            <p>AethraSea is a high-performance Folia/Paper fork focused on finding the perfect balance between multi-threaded performance, vanilla behavior, and stability in high-load Minecraft environments.</p>
+
+                            <h3 class="text-sm font-bold text-white mt-6">System Requirements</h3>
+                            <ul class="list-disc list-inside space-y-1 text-slate-400">
+                                <li>Java Development Kit (JDK) 21 or higher</li>
+                                <li>Multi-core CPU (Recommended 4+ dedicated cores for region thread allocation)</li>
+                                <li>64-bit Linux / Windows Server environment</li>
+                            </ul>
+
+                            <h3 class="text-sm font-bold text-white mt-6">First Launch</h3>
+                            <p>Place <code class="text-brand-500 code-font">aethrasea-paperclip-26.2.jar</code> into an empty directory and execute:</p>
+                            
+                            <div class="p-3 bg-slate-950 rounded border border-subtle code-font text-slate-200 flex justify-between items-center">
+                                <code>java -Xms4G -Xmx4G -jar aethrasea-paperclip-26.2.jar --nogui</code>
+                                <button onclick="copyToClipboard('java -Xms4G -Xmx4G -jar aethrasea-paperclip-26.2.jar --nogui')" class="text-slate-400 hover:text-white"><i class="fa-regular fa-copy"></i></button>
+                            </div>
+
+                            <p>On initial boot, AethraSea will automatically extract libraries and generate the <code class="text-brand-500 code-font">sea.yml</code> configuration file.</p>
+                        </div>
+                    </div>
+
+                    <!-- Section: FAQ -->
+                    <div id="docs-faq" class="doc-content hidden space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / faq</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">Frequently Asked Questions</h1>
+                            <p class="text-xs text-slate-400 mt-1">Common questions regarding compatibility, performance, and plugins.</p>
+                        </div>
+
+                        <div class="space-y-4 text-xs text-slate-300 leading-relaxed">
+                            <div class="p-4 rounded-lg bg-slate-900/60 border border-subtle space-y-1">
+                                <h3 class="font-bold text-white">Is AethraSea compatible with Paper plugins?</h3>
+                                <p class="text-slate-400">AethraSea inherits Folia's regionized multi-threading model. Standard Paper plugins that do not access main-thread singletons without region checks work out of the box or via Folia schedulers.</p>
+                            </div>
+                            <div class="p-4 rounded-lg bg-slate-900/60 border border-subtle space-y-1">
+                                <h3 class="font-bold text-white">How does Async Pathfinding help reduce lag?</h3>
+                                <p class="text-slate-400">Pathfinding calculations for entities are dispatched to background thread pools using thread-safe navigation tasks, preventing high mob populations from choking the region tick loop.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Useful Sites -->
+                    <div id="docs-useful-sites" class="doc-content hidden space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / useful-sites</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">Useful Websites & Community</h1>
+                            <p class="text-xs text-slate-400 mt-1">External resources, repositories, and community groups.</p>
+                        </div>
+
+                        <div class="grid sm:grid-cols-2 gap-4 text-xs">
+                            <a href="https://github.com/seazexyz/AethraSea" target="_blank" rel="noopener" class="p-4 rounded-lg bg-slate-900 border border-subtle hover:border-brand-500/40 transition-colors block space-y-1">
+                                <div class="font-bold text-white flex items-center justify-between">
+                                    <span>GitHub Repository</span>
+                                    <i class="fa-brands fa-github text-slate-400"></i>
+                                </div>
+                                <p class="text-slate-400 text-[11px]">Official source code, issues tracker, and releases.</p>
+                            </a>
+                            <a href="https://discord.com" target="_blank" rel="noopener" class="p-4 rounded-lg bg-slate-900 border border-subtle hover:border-brand-500/40 transition-colors block space-y-1">
+                                <div class="font-bold text-white flex items-center justify-between">
+                                    <span>Discord Server</span>
+                                    <i class="fa-brands fa-discord text-slate-400"></i>
+                                </div>
+                                <p class="text-slate-400 text-[11px]">Community chat, announcements, and developer support.</p>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: sea.yml Specification -->
+                    <div id="docs-config" class="doc-content hidden space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / sea.yml</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">sea.yml Configuration Reference</h1>
+                            <p class="text-xs text-slate-400 mt-1">Complete configuration schema and description of values.</p>
+                        </div>
+
+                        <div class="space-y-4 text-xs text-slate-300">
+                            <div class="p-4 bg-[#070a10] rounded-lg border border-subtle code-font leading-relaxed overflow-x-auto text-slate-300">
+<pre><span class="text-slate-500"># AethraSea Core Configuration</span>
+brand:
+  f3-brand-name: 'AethraSea'
+  server-name: 'AethraSea Engine'
+
+performance:
+  smart-region-merging: true
+  async-chunk-io: true
+  async-pathfinding: true
+  pathfinding-threads: 4
+  chunk-system:
+    parallel-chunk-loading: true
+    chunk-loading-parallelism: 0 # 0 = Auto allocate cores / 2
+
+network:
+  packet-flood-limiter: true
+  max-packets-per-second: 500
+
+security:
+  book-sign-payload-validator: true
+  max-sign-text-length: 384
+  max-book-pages: 100</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: JVM Flags -->
+                    <div id="docs-jvm-flags" class="doc-content hidden space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / jvm-flags</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">Recommended JVM Flags</h1>
+                            <p class="text-xs text-slate-400 mt-1">Optimized garbage collection parameters for Java 21+.</p>
+                        </div>
+
+                        <div class="space-y-3 text-xs text-slate-300">
+                            <p>For high-concurrency regionized workloads with G1GC or ZGC, use the following startup flags:</p>
+                            <div class="p-3 bg-slate-950 rounded border border-subtle code-font text-slate-200 overflow-x-auto flex justify-between items-center gap-2">
+                                <code class="text-[11px]">java -Xms8G -Xmx8G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -jar aethrasea-paperclip-26.2.jar --nogui</code>
+                                <button onclick="copyToClipboard('java -Xms8G -Xmx8G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -jar aethrasea-paperclip-26.2.jar --nogui')" class="text-slate-400 hover:text-white shrink-0"><i class="fa-regular fa-copy"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Package Specs -->
+                    <div id="docs-architecture" class="doc-content hidden space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / architecture</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">Package Architecture</h1>
+                            <p class="text-xs text-slate-400 mt-1">Internal package separation under dev.folia.sea.*</p>
+                        </div>
+
+                        <div class="grid sm:grid-cols-2 gap-4 text-xs">
+                            <div class="p-4 rounded-lg bg-slate-900 border border-subtle space-y-1">
+                                <span class="font-mono text-brand-500 font-bold">dev.folia.sea.config</span>
+                                <p class="text-slate-400">Manages sea.yml lifecycle and Moonrise executor setup.</p>
+                            </div>
+                            <div class="p-4 rounded-lg bg-slate-900 border border-subtle space-y-1">
+                                <span class="font-mono text-brand-500 font-bold">dev.folia.sea.network</span>
+                                <p class="text-slate-400">Pre-dispatch packet flood filtering and payload sanity checks.</p>
+                            </div>
+                            <div class="p-4 rounded-lg bg-slate-900 border border-subtle space-y-1">
+                                <span class="font-mono text-brand-500 font-bold">dev.folia.sea.pathfinding</span>
+                                <p class="text-slate-400">Dedicated executor pool for entity navigation.</p>
+                            </div>
+                            <div class="p-4 rounded-lg bg-slate-900 border border-subtle space-y-1">
+                                <span class="font-mono text-brand-500 font-bold">dev.folia.sea.monitor</span>
+                                <p class="text-slate-400">1 Hz tick performance sampling and BossBar output.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: HUD & GUI Diagnostics -->
+                    <div id="docs-hud" class="doc-content hidden space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / diagnostics</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">In-Game Diagnostics</h1>
+                            <p class="text-xs text-slate-400 mt-1">BossBars and administrative dashboard GUI commands.</p>
+                        </div>
+
+                        <div class="space-y-3 text-xs text-slate-300">
+                            <div class="p-3 bg-slate-900 border border-subtle rounded space-y-1 font-mono">
+                                <span class="text-brand-500">/tpsbar [on|off]</span>
+                                <p class="text-slate-400 text-[11px]">Toggles real-time region MSPT and median TPS BossBar.</p>
+                            </div>
+                            <div class="p-3 bg-slate-900 border border-subtle rounded space-y-1 font-mono">
+                                <span class="text-brand-500">/rambar [on|off]</span>
+                                <p class="text-slate-400 text-[11px]">Displays live JVM heap memory allocation.</p>
+                            </div>
+                            <div class="p-3 bg-slate-900 border border-subtle rounded space-y-1 font-mono">
+                                <span class="text-brand-500">/seagui</span>
+                                <p class="text-slate-400 text-[11px]">Opens administrative 54-slot diagnostic inventory menu.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 5: Gradle Build Workflow -->
+                    <div id="docs-build" class="doc-content hidden space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / build</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">Gradle Build Instructions</h1>
+                            <p class="text-xs text-slate-400 mt-1">Steps for applying patches and compiling the core jar.</p>
+                        </div>
+
+                        <div class="space-y-3 text-xs text-slate-300">
+                            <p>1. Apply source patches:</p>
+                            <div class="p-3 bg-slate-950 rounded border border-subtle code-font text-slate-200">
+                                <code>.\gradlew.bat applyAllPatches --no-configuration-cache</code>
+                            </div>
+
+                            <p>2. Compile Paperclip binary:</p>
+                            <div class="p-3 bg-slate-950 rounded border border-subtle code-font text-slate-200">
+                                <code>.\gradlew.bat createPaperclipJar --no-configuration-cache</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: API Guide -->
+                    <div id="docs-api-guide" class="doc-content hidden space-y-6">
+                        <div class="border-b border-subtle pb-4">
+                            <span class="text-xs font-mono text-brand-500">docs / api</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">API Usage Guide</h1>
+                            <p class="text-xs text-slate-400 mt-1">Developing plugins against AethraSea region APIs.</p>
+                        </div>
+
+                        <div class="space-y-3 text-xs text-slate-300">
+                            <p>AethraSea exposes region scheduler hooks identical to standard Folia APIs. Always dispatch region-specific entity and block modifications using the appropriate scheduler:</p>
+                            <div class="p-3 bg-[#070a10] rounded border border-subtle code-font text-slate-300">
+<pre><code class="text-slate-400">Bukkit.getRegionScheduler().run(plugin, location, task -> {
+    <span class="text-slate-500">// Region-safe execution here</span>
+});</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Quick Search Modal (Cmd+K) -->
+    <div id="search-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-start justify-center pt-20 px-4">
+        <div class="bg-dark-card border border-subtle rounded-xl max-w-xl w-full p-4 shadow-2xl space-y-3">
+            <div class="flex items-center gap-3 border-b border-subtle pb-3">
+                <i class="fa-solid fa-magnifying-glass text-slate-400 text-sm"></i>
+                <input type="text" id="search-input" onkeyup="filterDocsSearch()" placeholder="Type to search documentation..." class="bg-transparent text-sm text-white focus:outline-none w-full">
+                <button onclick="closeSearchModal()" class="text-slate-400 text-xs hover:text-white">ESC</button>
+            </div>
+
+            <div id="search-results" class="space-y-1 text-xs max-h-60 overflow-y-auto">
+                <a href="#docs" onclick="navigateDocsSection('docs-getting-started')" class="block p-2 rounded hover:bg-slate-900 text-slate-300">
+                    <span class="font-bold text-white block">Getting Started</span>
+                    <span class="text-[11px] text-slate-500">Java requirements, boot flags, first launch</span>
+                </a>
+                <a href="#docs" onclick="navigateDocsSection('docs-faq')" class="block p-2 rounded hover:bg-slate-900 text-slate-300">
+                    <span class="font-bold text-white block">Frequently Asked Questions</span>
+                    <span class="text-[11px] text-slate-500">Paper compatibility and async pathfinding</span>
+                </a>
+                <a href="#docs" onclick="navigateDocsSection('docs-config')" class="block p-2 rounded hover:bg-slate-900 text-slate-300">
+                    <span class="font-bold text-white block">sea.yml Specification</span>
+                    <span class="text-[11px] text-slate-500">Performance, network, and security options</span>
+                </a>
+                <a href="#docs" onclick="navigateDocsSection('docs-jvm-flags')" class="block p-2 rounded hover:bg-slate-900 text-slate-300">
+                    <span class="font-bold text-white block">JVM Flags & Performance</span>
+                    <span class="text-[11px] text-slate-500">Recommended G1GC parameters</span>
+                </a>
+                <a href="#docs" onclick="navigateDocsSection('docs-hud')" class="block p-2 rounded hover:bg-slate-900 text-slate-300">
+                    <span class="font-bold text-white block">HUD & Diagnostic Commands</span>
+                    <span class="text-[11px] text-slate-500">/tpsbar, /rambar, /seagui options</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-subtle py-8 bg-slate-950/60 text-xs text-slate-400 font-mono">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2">
+                <div class="w-5 h-5 rounded bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-500 text-[10px]">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <span>AethraSea Engine (seadomine.com)</span>
+            </div>
+            <div>
+                <span>GPL-3.0 License · Folia 26.2 Fork</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // SPA Routing Navigation
+        function navigate(viewName) {
+            document.getElementById('view-home').classList.add('hidden');
+            document.getElementById('view-download').classList.add('hidden');
+            document.getElementById('view-docs').classList.add('hidden');
+
+            document.getElementById('nav-home').className = "px-3 py-1.5 rounded-md hover:text-white transition-colors text-slate-400";
+            document.getElementById('nav-download').className = "px-3 py-1.5 rounded-md hover:text-white transition-colors text-slate-400";
+            document.getElementById('nav-docs').className = "px-3 py-1.5 rounded-md hover:text-white transition-colors text-slate-400";
+
+            if (viewName === 'home') {
+                document.getElementById('view-home').classList.remove('hidden');
+                document.getElementById('nav-home').className = "px-3 py-1.5 rounded-md hover:text-white transition-colors text-white bg-slate-800/50";
+                window.location.hash = "home";
+            } else if (viewName === 'download') {
+                document.getElementById('view-download').classList.remove('hidden');
+                document.getElementById('nav-download').className = "px-3 py-1.5 rounded-md hover:text-white transition-colors text-white bg-slate-800/50";
+                window.location.hash = "download";
+            } else if (viewName === 'docs') {
+                document.getElementById('view-docs').classList.remove('hidden');
+                document.getElementById('nav-docs').className = "px-3 py-1.5 rounded-md hover:text-white transition-colors text-white bg-slate-800/50";
+                window.location.hash = "docs";
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Toggle Documentation Sub-sections (Fixed event.currentTarget bug)
+        function showDocSection(sectionId, btnElem) {
+            const sections = document.querySelectorAll('.doc-content');
+            sections.forEach(s => s.classList.add('hidden'));
+            
+            const target = document.getElementById(sectionId);
+            if (target) target.classList.remove('hidden');
+
+            const navBtns = document.querySelectorAll('.doc-nav-btn');
+            navBtns.forEach(btn => {
+                btn.className = "doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors";
+            });
+
+            if (btnElem) {
+                btnElem.className = "doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-500 border border-brand-500/20 font-medium";
+            } else {
+                const activeBtn = Array.from(navBtns).find(b => b.getAttribute('onclick')?.includes(sectionId));
+                if (activeBtn) activeBtn.className = "doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-500 border border-brand-500/20 font-medium";
+            }
+        }
+
+        function navigateDocsSection(sectionId) {
+            closeSearchModal();
+            navigate('docs');
+            showDocSection(sectionId);
+        }
+
+        // Search Modal logic
+        function openSearchModal() {
+            document.getElementById('search-modal').classList.remove('hidden');
+            document.getElementById('search-input').focus();
+        }
+
+        function closeSearchModal() {
+            document.getElementById('search-modal').classList.add('hidden');
+        }
+
+        function filterDocsSearch() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const results = document.querySelectorAll('#search-results a');
+            results.forEach(res => {
+                const text = res.textContent.toLowerCase();
+                if (text.includes(query)) {
+                    res.classList.remove('hidden');
+                } else {
+                    res.classList.add('hidden');
+                }
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                openSearchModal();
+            }
+            if (e.key === 'Escape') {
+                closeSearchModal();
+            }
+        });
+
+        // Mobile Menu toggle
+        function toggleMobileMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
+
+        // Copy Helper
+        function copyToClipboard(text) {
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-y-16', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('translate-y-16', 'opacity-0', 'pointer-events-none');
+            }, 2000);
+        }
+
+        // Initialize Router based on hash
+        window.addEventListener('load', () => {
+            const hash = window.location.hash.replace('#', '');
+            if (hash === 'docs' || hash === 'download' || hash === 'home') {
+                navigate(hash);
+            }
+        });
+    </script>
+</body>
+</html>
