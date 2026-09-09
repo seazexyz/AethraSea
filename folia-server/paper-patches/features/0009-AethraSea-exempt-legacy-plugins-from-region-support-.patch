@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Tue, 8 Sep 2026 19:02:19 +0700
+Subject: [PATCH] AethraSea: exempt legacy plugins from region-support check at
+ instance creation (CraftMagicNumbers.checkSupported)
+
+
+diff --git a/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java b/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
+index e526b322b7380ac92fea7d630370c2d802b190fe..7c538b3b111e7070a2c5a28914c77a54ba55d7a5 100644
+--- a/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
++++ b/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
+@@ -395,7 +395,9 @@ public final class CraftMagicNumbers implements UnsafeValues {
+         }
+ 
+         // Folia start - block plugins not marked as supported
+-        if (!descriptionFile.isFoliaSupported()) {
++        // AethraSea Hybrid Engine: legacy sources may host single-threaded Spigot plugins that are
++        // not region-aware; they are exempt from the Folia-support check.
++        if (!descriptionFile.isFoliaSupported() && !io.papermc.paper.plugin.HybridPluginRuntime.isLegacyName(descriptionFile.getName())) {
+             throw new InvalidPluginException("Plugin " + descriptionFile.getFullName() + " is not marked as supporting regionised multithreading");
+         }
+         // Folia end - block plugins not marked as supported

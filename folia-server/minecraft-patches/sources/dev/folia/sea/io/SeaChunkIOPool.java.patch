@@ -1,0 +1,115 @@
+--- /dev/null
++++ b/dev/folia/sea/io/SeaChunkIOPool.java
+@@ -1,0 +_,112 @@
++package dev.folia.sea.io;
++
++import com.mojang.logging.LogUtils;
++import dev.folia.sea.config.SeaConfig;
++import org.slf4j.Logger;
++
++import java.util.concurrent.*;
++import java.util.concurrent.atomic.AtomicInteger;
++import java.util.concurrent.atomic.AtomicLong;
++
++public final class SeaChunkIOPool {
++
++    private static final Logger LOGGER = LogUtils.getLogger();
++    private static final AtomicInteger THREAD_ID = new AtomicInteger(1);
++    private static final AtomicLong TOTAL_TASKS_PROCESSED = new AtomicLong(0);
++    private static final AtomicLong TOTAL_BYTES_SAVED = new AtomicLong(0);
++
++    private static final ThreadPoolExecutor IO_EXECUTOR = new ThreadPoolExecutor(
++            2,
++            Math.max(4, Runtime.getRuntime().availableProcessors()),
++            60L,
++            TimeUnit.SECONDS,
++            new LinkedBlockingQueue<>(),
++            r -> {
++                Thread thread = new Thread(r, "Sea-ChunkIO-Worker-" + THREAD_ID.getAndIncrement());
++                thread.setDaemon(true);
++                thread.setPriority(Thread.NORM_PRIORITY - 1);
++                return thread;
++            }
++    );
++
++    static {
++        IO_EXECUTOR.allowCoreThreadTimeOut(true);
++    }
++
++    private SeaChunkIOPool() {}
++
++    public static void execute(Runnable task) {
++        if (!SeaConfig.asyncChunkIo) {
++            task.run();
++            return;
++        }
++        IO_EXECUTOR.execute(() -> {
++            try {
++                task.run();
++                TOTAL_TASKS_PROCESSED.incrementAndGet();
++            } catch (Throwable t) {
++                LOGGER.error("[SeaChunkIOPool] Error executing background chunk I/O task", t);
++            }
++        });
++    }
++
++    public static <T> Future<T> submit(Callable<T> task) {
++        if (!SeaConfig.asyncChunkIo) {
++            try {
++                T result = task.call();
++                TOTAL_TASKS_PROCESSED.incrementAndGet();
++                return CompletableFuture.completedFuture(result);
++            } catch (Exception e) {
++                CompletableFuture<T> failed = new CompletableFuture<>();
++                failed.completeExceptionally(e);
++                return failed;
++            }
++        }
++        return IO_EXECUTOR.submit(() -> {
++            try {
++                T result = task.call();
++                TOTAL_TASKS_PROCESSED.incrementAndGet();
++                return result;
++            } catch (Throwable t) {
++                LOGGER.error("[SeaChunkIOPool] Error executing background chunk I/O callable", t);
++                throw t;
++            }
++        });
++    }
++
++    public static void recordBytesSaved(long bytes) {
++        TOTAL_BYTES_SAVED.addAndGet(bytes);
++    }
++
++    public static int getActiveThreads() {
++        return IO_EXECUTOR.getActiveCount();
++    }
++
++    public static int getPoolSize() {
++        return IO_EXECUTOR.getPoolSize();
++    }
++
++    public static int getQueueSize() {
++        return IO_EXECUTOR.getQueue().size();
++    }
++
++    public static long getTotalTasksProcessed() {
++        return TOTAL_TASKS_PROCESSED.get();
++    }
++
++    public static long getTotalBytesSaved() {
++        return TOTAL_BYTES_SAVED.get();
++    }
++
++    public static void shutdown() {
++        IO_EXECUTOR.shutdown();
++        try {
++            if (!IO_EXECUTOR.awaitTermination(3, TimeUnit.SECONDS)) {
++                IO_EXECUTOR.shutdownNow();
++            }
++        } catch (InterruptedException e) {
++            IO_EXECUTOR.shutdownNow();
++            Thread.currentThread().interrupt();
++        }
++    }
++}

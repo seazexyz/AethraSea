@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Tue, 8 Sep 2026 18:42:46 +0700
+Subject: [PATCH] AethraSea: allow legacy Spigot plugins from legacy sources
+ despite missing Folia support flag
+
+
+diff --git a/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java b/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
+index 130e5d743974057605fcfe9769d6257dd7b70c88..49d5770c4fef50a6097541d502f8e9dd17a7ea9e 100644
+--- a/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
++++ b/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
+@@ -98,7 +98,7 @@ public final class HybridPluginRuntime {
+         return isLegacyName(plugin.getName());
+     }
+ 
+-    private static boolean isLegacyName(final String pluginName) {
++    public static boolean isLegacyName(final String pluginName) {
+         final String normalized = normalize(pluginName);
+         synchronized (LOCK) {
+             return LEGACY_NAMES.contains(normalized);
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java
+index 6ef0042a355c65262bdb89dcf151bd644653216d..613288b5a65cd05293198e558533d8ac173d5fb6 100644
+--- a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java
++++ b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProviderFactory.java
+@@ -27,7 +27,9 @@ class SpigotPluginProviderFactory implements PluginTypeFactory<SpigotPluginProvi
+     @Override
+     public SpigotPluginProvider build(JarFile file, PluginDescriptionFile configuration, Path source) throws InvalidDescriptionException {
+         // Folia start - block plugins not marked as supported
+-        if (!configuration.isFoliaSupported()) {
++        // AethraSea Hybrid Engine: legacy sources (plugins/paper etc.) may host single-threaded
++        // Spigot plugins that are not Folia-aware; they are exempt from the Folia-support check.
++        if (!configuration.isFoliaSupported() && !io.papermc.paper.plugin.HybridPluginRuntime.isLegacyName(configuration.getName())) {
+             throw new RuntimeException("Could not load plugin '" + configuration.getDisplayName() + "' as it is not marked as supporting Folia!");
+         }
+         // Folia end - block plugins not marked as supported

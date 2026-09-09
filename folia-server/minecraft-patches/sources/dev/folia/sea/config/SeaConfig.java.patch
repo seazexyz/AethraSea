@@ -1,0 +1,149 @@
+--- /dev/null
++++ b/dev/folia/sea/config/SeaConfig.java
+@@ -1,0 +_,146 @@
++package dev.folia.sea.config;
++
++import com.mojang.logging.LogUtils;
++import org.bukkit.configuration.file.YamlConfiguration;
++import org.slf4j.Logger;
++
++import java.io.File;
++import java.io.IOException;
++import java.util.List;
++
++public final class SeaConfig {
++
++    private static final Logger LOGGER = LogUtils.getLogger();
++    private static final File CONFIG_FILE = new File("sea.yml");
++    private static YamlConfiguration config;
++
++    // Brand settings
++    public static String f3BrandName = "uniquecraft";
++    public static String serverName = "uniquecraft";
++
++    // Performance settings
++    public static boolean smartRegionMerging = true;
++    public static int regionMergeHysteresisTicks = 20;
++    public static boolean asyncChunkIo = true;
++    public static boolean asyncPathfinding = true;
++    public static int pathfindingThreads = 4;
++
++    // Gameplay settings
++    public static boolean stasisChamberFix = true;
++    public static boolean smoothCrossRegionFluids = true;
++    public static boolean crossRegionVehicleRubberbandFix = true;
++    public static boolean crossRegionVillagerPoiSync = true;
++
++    // Network settings
++    public static boolean packetFloodLimiter = true;
++    public static int maxPacketsPerSecond = 500;
++    public static boolean regionPacketRateLimit = true;
++    public static boolean asyncPacketEvents = true;
++
++    // Security & Stability settings
++    public static boolean gracefulRegionRecovery = true;
++    public static boolean bookSignPayloadValidator = true;
++    public static int maxSignTextLength = 384;
++    public static int maxBookPages = 100;
++    public static int maxBookPageLength = 1024;
++
++    // GUI settings
++    public static boolean guiEnabled = true;
++
++    private SeaConfig() {}
++
++    public static void init() {
++        if (!CONFIG_FILE.exists()) {
++            createDefaultConfig();
++        }
++        loadConfig();
++    }
++
++    private static void createDefaultConfig() {
++        config = new YamlConfiguration();
++
++        // Brand
++        config.set("brand.f3-brand-name", "uniquecraft");
++        config.set("brand.server-name", "uniquecraft");
++
++        // Performance & Threading
++        config.set("performance.smart-region-merging", true);
++        config.set("performance.region-merge-hysteresis-ticks", 20);
++        config.set("performance.async-chunk-io", true);
++        config.set("performance.async-pathfinding", true);
++        config.set("performance.pathfinding-threads", Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
++
++        // Gameplay & Folia Mechanics
++        config.set("gameplay.stasis-chamber-fix", true);
++        config.set("gameplay.smooth-cross-region-fluids", true);
++        config.set("gameplay.cross-region-vehicle-rubberband-fix", true);
++        config.set("gameplay.cross-region-villager-poi-sync", true);
++
++        // Network & Security
++        config.set("network.packet-flood-limiter", true);
++        config.set("network.max-packets-per-second", 500);
++        config.set("network.region-packet-rate-limit", true);
++        config.set("network.async-packet-events", true);
++
++        // Security & Stability
++        config.set("security.graceful-region-recovery", true);
++        config.set("security.book-sign-payload-validator", true);
++        config.set("security.max-sign-text-length", 384);
++        config.set("security.max-book-pages", 100);
++        config.set("security.max-book-page-length", 1024);
++
++        // GUI
++        config.set("gui.enabled", true);
++
++        try {
++            config.save(CONFIG_FILE);
++            LOGGER.info("[SeaConfig] Created default sea.yml configuration.");
++        } catch (IOException e) {
++            LOGGER.error("[SeaConfig] Could not save default sea.yml", e);
++        }
++    }
++
++    public static void loadConfig() {
++        try {
++            config = YamlConfiguration.loadConfiguration(CONFIG_FILE);
++
++            // Brand
++            f3BrandName = config.getString("brand.f3-brand-name", "uniquecraft");
++            serverName = config.getString("brand.server-name", "uniquecraft");
++
++            // Performance
++            smartRegionMerging = config.getBoolean("performance.smart-region-merging", true);
++            regionMergeHysteresisTicks = config.getInt("performance.region-merge-hysteresis-ticks", 20);
++            asyncChunkIo = config.getBoolean("performance.async-chunk-io", true);
++            asyncPathfinding = config.getBoolean("performance.async-pathfinding", true);
++            pathfindingThreads = config.getInt("performance.pathfinding-threads", Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
++
++            // Gameplay
++            stasisChamberFix = config.getBoolean("gameplay.stasis-chamber-fix", true);
++            smoothCrossRegionFluids = config.getBoolean("gameplay.smooth-cross-region-fluids", true);
++            crossRegionVehicleRubberbandFix = config.getBoolean("gameplay.cross-region-vehicle-rubberband-fix", true);
++            crossRegionVillagerPoiSync = config.getBoolean("gameplay.cross-region-villager-poi-sync", true);
++
++            // Network
++            packetFloodLimiter = config.getBoolean("network.packet-flood-limiter", true);
++            maxPacketsPerSecond = config.getInt("network.max-packets-per-second", 500);
++            regionPacketRateLimit = config.getBoolean("network.region-packet-rate-limit", true);
++            asyncPacketEvents = config.getBoolean("network.async-packet-events", true);
++
++            // Security
++            gracefulRegionRecovery = config.getBoolean("security.graceful-region-recovery", true);
++            bookSignPayloadValidator = config.getBoolean("security.book-sign-payload-validator", true);
++            maxSignTextLength = config.getInt("security.max-sign-text-length", 384);
++            maxBookPages = config.getInt("security.max-book-pages", 100);
++            maxBookPageLength = config.getInt("security.max-book-page-length", 1024);
++
++            // GUI
++            guiEnabled = config.getBoolean("gui.enabled", true);
++
++            LOGGER.info("[SeaConfig] Successfully loaded sea.yml (Brand: {}, Async I/O: {}, Async Pathfinding: {}, Stasis Fix: {})",
++                    f3BrandName, asyncChunkIo, asyncPathfinding, stasisChamberFix);
++        } catch (Exception e) {
++            LOGGER.error("[SeaConfig] Failed to load sea.yml, using default values", e);
++        }
++    }
++}

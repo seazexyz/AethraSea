@@ -1,0 +1,93 @@
+--- /dev/null
++++ b/io/papermc/paper/threadedregions/SnapshotCache.java
+@@ -1,0 +_,90 @@
++package io.papermc.paper.threadedregions;
++
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.List;
++import java.util.concurrent.atomic.AtomicReference;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.server.level.ServerPlayer;
++import net.minecraft.server.players.PlayerList;
++
++/**
++ * AethraSea Hybrid Engine - read-copy-update snapshot of global server state.
++ *
++ * <p>Captured on the legacy virtual main thread at its 20 TPS tick boundary and published
++ * atomically. Reads are performed on data structures that are safe to read from any thread
++ * ({@link java.util.concurrent.CopyOnWriteArrayList} for the player list, a defensive copy of the
++ * world list), so any thread - including the virtual main thread and legacy plugins running there -
++ * can see a consistent, immutable view of the server without performing region crossings.</p>
++ */
++public final class SnapshotCache {
++
++    public record Snapshot(long tick, List<String> players, List<String> worlds) {
++
++        public int onlinePlayers() {
++            return this.players.size();
++        }
++    }
++
++    private static final AtomicReference<Snapshot> CURRENT = new AtomicReference<>(new Snapshot(-1L, List.of(), List.of()));
++
++    private SnapshotCache() {
++    }
++
++    /**
++     * Builds and publishes a new snapshot from the current server state.
++     */
++    public static void capture(final long tick) {
++        final MinecraftServer server = MinecraftServer.getServer();
++        if (server == null) {
++            return;
++        }
++        final PlayerList playerList = server.getPlayerList();
++        if (playerList == null) {
++            return;
++        }
++
++        // CopyOnWriteArrayList - weakly consistent, safe to iterate from any thread
++        final List<String> playerNames = new ArrayList<>(playerList.getPlayers().size());
++        for (final ServerPlayer player : playerList.getPlayers()) {
++            playerNames.add(player.getGameProfile().name());
++        }
++
++        final List<ServerLevel> worlds = new ArrayList<>();
++        for (final ServerLevel world : server.getAllLevels()) {
++            worlds.add(world);
++        }
++        final List<String> worldNames = new ArrayList<>(worlds.size());
++        for (final ServerLevel world : worlds) {
++            worldNames.add(world.getWorld().getName());
++        }
++
++        final Snapshot snapshot = new Snapshot(
++            tick,
++            Collections.unmodifiableList(playerNames),
++            Collections.unmodifiableList(worldNames)
++        );
++        CURRENT.set(snapshot);
++    }
++
++    public static Snapshot current() {
++        return CURRENT.get();
++    }
++
++    public static long getCurrentTick() {
++        return CURRENT.get().tick();
++    }
++
++    public static int getOnlinePlayerCount() {
++        return CURRENT.get().onlinePlayers();
++    }
++
++    public static List<String> getOnlinePlayerNames() {
++        return CURRENT.get().players();
++    }
++
++    public static List<String> getWorldNames() {
++        return CURRENT.get().worlds();
++    }
++}

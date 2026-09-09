@@ -1,0 +1,106 @@
+--- /dev/null
++++ b/dev/folia/sea/pathfinding/SeaPathfindingPool.java
+@@ -1,0 +_,103 @@
++package dev.folia.sea.pathfinding;
++
++import com.mojang.logging.LogUtils;
++import dev.folia.sea.config.SeaConfig;
++import org.slf4j.Logger;
++
++import java.util.concurrent.*;
++import java.util.concurrent.atomic.AtomicInteger;
++import java.util.concurrent.atomic.AtomicLong;
++import java.util.function.Consumer;
++import java.util.function.Supplier;
++
++public final class SeaPathfindingPool {
++
++    private static final Logger LOGGER = LogUtils.getLogger();
++    private static final AtomicInteger THREAD_ID = new AtomicInteger(1);
++    private static final AtomicLong TOTAL_PATHS_CALCULATED = new AtomicLong(0);
++    private static final AtomicLong TOTAL_CALC_TIME_NANOS = new AtomicLong(0);
++
++    private static final ThreadPoolExecutor PATHFINDING_EXECUTOR = new ThreadPoolExecutor(
++            2,
++            Math.max(4, Runtime.getRuntime().availableProcessors()),
++            30L,
++            TimeUnit.SECONDS,
++            new LinkedBlockingQueue<>(2048),
++            r -> {
++                Thread thread = new Thread(r, "Sea-Pathfinding-Worker-" + THREAD_ID.getAndIncrement());
++                thread.setDaemon(true);
++                thread.setPriority(Thread.NORM_PRIORITY - 1);
++                return thread;
++            },
++            new ThreadPoolExecutor.DiscardOldestPolicy()
++    );
++
++    static {
++        PATHFINDING_EXECUTOR.allowCoreThreadTimeOut(true);
++    }
++
++    private SeaPathfindingPool() {}
++
++    public static <T> void computeAsync(Supplier<T> pathSupplier, Consumer<T> callback) {
++        if (!SeaConfig.asyncPathfinding) {
++            long start = System.nanoTime();
++            T result = pathSupplier.get();
++            TOTAL_CALC_TIME_NANOS.addAndGet(System.nanoTime() - start);
++            TOTAL_PATHS_CALCULATED.incrementAndGet();
++            callback.accept(result);
++            return;
++        }
++
++        try {
++            PATHFINDING_EXECUTOR.execute(() -> {
++                long start = System.nanoTime();
++                try {
++                    T result = pathSupplier.get();
++                    TOTAL_CALC_TIME_NANOS.addAndGet(System.nanoTime() - start);
++                    TOTAL_PATHS_CALCULATED.incrementAndGet();
++                    callback.accept(result);
++                } catch (Throwable t) {
++                    LOGGER.debug("[SeaPathfindingPool] Exception during async path calculation", t);
++                }
++            });
++        } catch (RejectedExecutionException e) {
++            // Queue full, fallback to direct run
++            T result = pathSupplier.get();
++            callback.accept(result);
++        }
++    }
++
++    public static int getActiveThreads() {
++        return PATHFINDING_EXECUTOR.getActiveCount();
++    }
++
++    public static int getPoolSize() {
++        return PATHFINDING_EXECUTOR.getPoolSize();
++    }
++
++    public static int getQueueSize() {
++        return PATHFINDING_EXECUTOR.getQueue().size();
++    }
++
++    public static long getTotalPathsCalculated() {
++        return TOTAL_PATHS_CALCULATED.get();
++    }
++
++    public static double getAverageCalcTimeMicros() {
++        long count = TOTAL_PATHS_CALCULATED.get();
++        if (count == 0) return 0.0;
++        return (TOTAL_CALC_TIME_NANOS.get() / 1000.0) / count;
++    }
++
++    public static void shutdown() {
++        PATHFINDING_EXECUTOR.shutdown();
++        try {
++            if (!PATHFINDING_EXECUTOR.awaitTermination(2, TimeUnit.SECONDS)) {
++                PATHFINDING_EXECUTOR.shutdownNow();
++            }
++        } catch (InterruptedException e) {
++            PATHFINDING_EXECUTOR.shutdownNow();
++            Thread.currentThread().interrupt();
++        }
++    }
++}

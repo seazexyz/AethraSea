@@ -1,0 +1,148 @@
+--- /dev/null
++++ b/dev/folia/sea/gui/SeaStatusGUI.java
+@@ -1,0 +_,145 @@
++package dev.folia.sea.gui;
++
++import dev.folia.sea.config.SeaConfig;
++import dev.folia.sea.io.SeaChunkIOPool;
++import dev.folia.sea.network.SeaPacketEventPipeline;
++import dev.folia.sea.pathfinding.SeaPathfindingPool;
++import net.minecraft.server.MinecraftServer;
++import org.bukkit.Bukkit;
++import org.bukkit.ChatColor;
++import org.bukkit.Material;
++import org.bukkit.entity.Player;
++import org.bukkit.inventory.Inventory;
++import org.bukkit.inventory.ItemStack;
++import org.bukkit.inventory.meta.ItemMeta;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.List;
++
++public final class SeaStatusGUI {
++
++    public static final String GUI_TITLE = ChatColor.DARK_AQUA + "" + ChatColor.BOLD + "UniqueCraft " + ChatColor.DARK_GRAY + "» " + ChatColor.WHITE + "System Status";
++
++    private SeaStatusGUI() {}
++
++    public static void open(Player player) {
++        Inventory inv = Bukkit.createInventory(player, 54, GUI_TITLE);
++
++        // Fill background with glass panes
++        ItemStack grayGlass = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
++        ItemStack cyanGlass = createItem(Material.CYAN_STAINED_GLASS_PANE, " ");
++        ItemStack blueGlass = createItem(Material.LIGHT_BLUE_STAINED_GLASS_PANE, " ");
++
++        for (int i = 0; i < 54; i++) {
++            inv.setItem(i, grayGlass);
++        }
++        for (int i : new int[]{0, 1, 7, 8, 9, 17, 36, 44, 45, 46, 52, 53}) {
++            inv.setItem(i, cyanGlass);
++        }
++        for (int i : new int[]{2, 6, 18, 26, 27, 35, 47, 51}) {
++            inv.setItem(i, blueGlass);
++        }
++
++        // Slot 13: Server Summary
++        long totalMemory = Runtime.getRuntime().totalMemory() / 1024 / 1024;
++        long freeMemory = Runtime.getRuntime().freeMemory() / 1024 / 1024;
++        long usedMemory = totalMemory - freeMemory;
++        long maxMemory = Runtime.getRuntime().maxMemory() / 1024 / 1024;
++
++        inv.setItem(13, createItem(
++                Material.NETHER_STAR,
++                ChatColor.AQUA + "" + ChatColor.BOLD + "UniqueCraft Server Status",
++                ChatColor.GRAY + "• Brand Name: " + ChatColor.GOLD + SeaConfig.f3BrandName,
++                ChatColor.GRAY + "• Server Name: " + ChatColor.WHITE + SeaConfig.serverName,
++                ChatColor.GRAY + "• Minecraft Version: " + ChatColor.GREEN + Bukkit.getMinecraftVersion(),
++                ChatColor.GRAY + "• Folia Multithreaded Core: " + ChatColor.AQUA + "Active",
++                ChatColor.GRAY + "• Online Players: " + ChatColor.YELLOW + Bukkit.getOnlinePlayers().size() + ChatColor.DARK_GRAY + " / " + Bukkit.getMaxPlayers()
++        ));
++
++        // Slot 20: Region Threading & TPS
++        inv.setItem(20, createItem(
++                Material.BEACON,
++                ChatColor.YELLOW + "" + ChatColor.BOLD + "Region Threading & Performance",
++                ChatColor.GRAY + "• Smart Region Merging: " + (SeaConfig.smartRegionMerging ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Merge Hysteresis Delay: " + ChatColor.WHITE + SeaConfig.regionMergeHysteresisTicks + " ticks",
++                ChatColor.GRAY + "• Thread Context Switching: " + ChatColor.GREEN + "Optimized",
++                ChatColor.GRAY + "• Dynamic Merging / Splitting: " + ChatColor.AQUA + "Adaptive"
++        ));
++
++        // Slot 22: Async Chunk I/O
++        inv.setItem(22, createItem(
++                Material.ANVIL,
++                ChatColor.GOLD + "" + ChatColor.BOLD + "Async Chunk I/O Pipeline",
++                ChatColor.GRAY + "• Status: " + (SeaConfig.asyncChunkIo ? ChatColor.GREEN + "ENABLED (Background Daemon)" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Active I/O Threads: " + ChatColor.WHITE + SeaChunkIOPool.getActiveThreads() + " threads",
++                ChatColor.GRAY + "• Total I/O Tasks Processed: " + ChatColor.YELLOW + SeaChunkIOPool.getTotalTasksProcessed(),
++                ChatColor.GRAY + "• Queued Disk Operations: " + ChatColor.WHITE + SeaChunkIOPool.getQueueSize()
++        ));
++
++        // Slot 24: Entity Pathfinding Pool
++        inv.setItem(24, createItem(
++                Material.COMPASS,
++                ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Mob A* Pathfinding Offload",
++                ChatColor.GRAY + "• Status: " + (SeaConfig.asyncPathfinding ? ChatColor.GREEN + "ENABLED (Async Workers)" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Dedicated Worker Pool: " + ChatColor.WHITE + SeaConfig.pathfindingThreads + " threads",
++                ChatColor.GRAY + "• Calculated Mob Paths: " + ChatColor.AQUA + SeaPathfindingPool.getTotalPathsCalculated(),
++                ChatColor.GRAY + "• Avg Calculation Time: " + ChatColor.GREEN + String.format("%.2f µs", SeaPathfindingPool.getAverageCalcTimeMicros())
++        ));
++
++        // Slot 29: Network & Security
++        inv.setItem(29, createItem(
++                Material.SHIELD,
++                ChatColor.RED + "" + ChatColor.BOLD + "Network & Security Protections",
++                ChatColor.GRAY + "• Packet Flood Limiter: " + (SeaConfig.packetFloodLimiter ? ChatColor.GREEN + "ENABLED (" + SeaConfig.maxPacketsPerSecond + " pkts/s)" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Region Packet Limiter: " + (SeaConfig.regionPacketRateLimit ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Graceful Thread Recovery: " + (SeaConfig.gracefulRegionRecovery ? ChatColor.GREEN + "ENABLED (Region Isolated)" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Book & Sign Sanitizer: " + (SeaConfig.bookSignPayloadValidator ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Intercepted Inbound: " + ChatColor.WHITE + SeaPacketEventPipeline.getTotalInboundPackets(),
++                ChatColor.GRAY + "• Dropped Spam Packets: " + ChatColor.RED + SeaPacketEventPipeline.getDroppedSpamPackets()
++        ));
++
++        // Slot 31: Gameplay & Stasis Fixes
++        inv.setItem(31, createItem(
++                Material.ENDER_PEARL,
++                ChatColor.BLUE + "" + ChatColor.BOLD + "Gameplay & Folia Fixes",
++                ChatColor.GRAY + "• Enderpearl Stasis Chamber: " + (SeaConfig.stasisChamberFix ? ChatColor.GREEN + "FIXED (Cross-Region)" : ChatColor.RED + "VANILLA"),
++                ChatColor.GRAY + "• Smooth Fluid Flow: " + (SeaConfig.smoothCrossRegionFluids ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Vehicle / Elytra Anti-Rubberband: " + (SeaConfig.crossRegionVehicleRubberbandFix ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Villager POI Sync: " + (SeaConfig.crossRegionVillagerPoiSync ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED")
++        ));
++
++        // Slot 33: Memory & Hardware
++        inv.setItem(33, createItem(
++                Material.CLOCK,
++                ChatColor.GREEN + "" + ChatColor.BOLD + "Memory & Hardware Metrics",
++                ChatColor.GRAY + "• Used Memory: " + ChatColor.YELLOW + usedMemory + " MB",
++                ChatColor.GRAY + "• Free Memory: " + ChatColor.GREEN + freeMemory + " MB",
++                ChatColor.GRAY + "• Allocated Heap: " + ChatColor.WHITE + totalMemory + " MB",
++                ChatColor.GRAY + "• Max Memory: " + ChatColor.WHITE + maxMemory + " MB",
++                ChatColor.GRAY + "• CPU Available Cores: " + ChatColor.AQUA + Runtime.getRuntime().availableProcessors() + " Cores"
++        ));
++
++        // Slot 49: Refresh Button
++        inv.setItem(49, createItem(
++                Material.LIME_DYE,
++                ChatColor.GREEN + "" + ChatColor.BOLD + "↻ Refresh Status",
++                ChatColor.GRAY + "Click to refresh realtime system metrics."
++        ));
++
++        player.openInventory(inv);
++    }
++
++    private static ItemStack createItem(Material material, String name, String... lore) {
++        ItemStack item = new ItemStack(material);
++        ItemMeta meta = item.getItemMeta();
++        if (meta != null) {
++            meta.setDisplayName(name);
++            if (lore != null && lore.length > 0) {
++                meta.setLore(Arrays.asList(lore));
++            }
++            item.setItemMeta(meta);
++        }
++        return item;
++    }
++}

@@ -1,0 +1,167 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Tue, 8 Sep 2026 21:32:30 +0700
+Subject: [PATCH] AethraSea: runtime world create without sync chunk gen; route
+ legacy world reads + commands through the virtual main thread
+
+
+diff --git a/src/main/java/io/papermc/paper/command/brigadier/bukkit/BukkitCommandNode.java b/src/main/java/io/papermc/paper/command/brigadier/bukkit/BukkitCommandNode.java
+index 5c52b1563d20d7e977a5bb958c18b19dec5c365a..bf8dfbbcf2bb37e6340036d38a00cca490a8ef9d 100644
+--- a/src/main/java/io/papermc/paper/command/brigadier/bukkit/BukkitCommandNode.java
++++ b/src/main/java/io/papermc/paper/command/brigadier/bukkit/BukkitCommandNode.java
+@@ -79,8 +79,18 @@ public class BukkitCommandNode extends LiteralCommandNode<CommandSourceStack> {
+             String content = context.getRange().get(context.getInput());
+             String[] args = org.apache.commons.lang3.StringUtils.split(content, ' '); // fix adjacent spaces (from console/plugins) causing empty array elements
+ 
+-            // Note: we don't return the result of target.execute as thats success / failure, we return handled (true) or not handled (false)
+-            this.command.execute(sender, this.literal, Arrays.copyOfRange(args, 1, args.length));
++            // AethraSea Hybrid Engine - legacy Bukkit commands run on the virtual main thread so any
++            // world reads they perform can be rerouted to the relevant region without tripping the
++            // Folia "Cannot read world asynchronously" guard. Never block a region/global tick thread
++            // waiting for the command: hand it to the virtual thread and return immediately.
++            if (!io.papermc.paper.threadedregions.PaperVirtualMainThread.isVirtualMainThread()) {
++                io.papermc.paper.threadedregions.PaperVirtualMainThread.schedule(() ->
++                    this.command.execute(sender, this.literal, Arrays.copyOfRange(args, 1, args.length))
++                );
++            } else {
++                // Note: we don't return the result of target.execute as thats success / failure, we return handled (true) or not handled (false)
++                this.command.execute(sender, this.literal, Arrays.copyOfRange(args, 1, args.length));
++            }
+ 
+             // return true as command was handled
+             return 1;
+diff --git a/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java b/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..2190692114af5506a6dda8e6e612e02f86072182
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java
+@@ -0,0 +1,63 @@
++package io.papermc.paper.threadedregions;
++
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.CompletionException;
++import java.util.function.Supplier;
++import net.minecraft.server.level.ServerLevel;
++
++/**
++ * AethraSea Hybrid Engine - bridge between the legacy "main thread" simulation and Folia's region
++ * threading.
++ *
++ * <p>Folia forbids reading world data except on the owning world's region thread. Legacy plugins
++ * running on {@link PaperVirtualMainThread} routinely read world data "from the main thread". This
++ * class reroutes such an access onto the chunk's own region (queue a chunk tick task) and blocks
++ * only the virtual main thread until the answer arrives. That is safe: the virtual main thread is
++ * never a Folia region/global thread, so region threads keep ticking and nothing can deadlock or
++ * trip the watchdog. Native Folia threads are never rerouted - for them the access executes inline,
++ * preserving Folia's normal semantics (an illegal off-region access still throws).
++ */
++public final class HybridRegionRead {
++
++    private HybridRegionRead() {
++    }
++
++    public static boolean isVirtualMainThread() {
++        return PaperVirtualMainThread.isVirtualMainThread();
++    }
++
++    public static <T> T onChunk(final ServerLevel level, final int chunkX, final int chunkZ, final Supplier<T> supplier) {
++        if (!PaperVirtualMainThread.isVirtualMainThread()) {
++            return supplier.get();
++        }
++        final CompletableFuture<T> gate = new CompletableFuture<>();
++        RegionizedServer.getInstance().taskQueue.queueTickTaskQueue(level, chunkX, chunkZ, () -> {
++            try {
++                gate.complete(supplier.get());
++            } catch (final Throwable throwable) {
++                gate.completeExceptionally(throwable);
++            }
++        });
++        RegionizedServer.getInstance().notifyTasks();
++        try {
++            return gate.join();
++        } catch (final CompletionException e) {
++            throw unwrap(e);
++        }
++    }
++
++    public static void runOnChunk(final ServerLevel level, final int chunkX, final int chunkZ, final Runnable task) {
++        onChunk(level, chunkX, chunkZ, () -> {
++            task.run();
++            return null;
++        });
++    }
++
++    private static RuntimeException unwrap(final CompletionException e) {
++        final Throwable cause = e.getCause() != null ? e.getCause() : e;
++        if (cause instanceof RuntimeException) {
++            return (RuntimeException) cause;
++        }
++        return new RuntimeException(cause);
++    }
++}
+\ No newline at end of file
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index 6f1e9701843542c007650b7942c447de49eb21a3..58c3a6c9fd4c269441415b515e95b59b984d4fcd 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -1344,19 +1344,26 @@ public final class CraftServer implements Server {
+             return null;
+         }
+ 
+-        // AethraSea Hybrid Engine - register the new world with the Folia regionized scheduler and
+-        // finish initialization asynchronously on the new world's OWN region. Chunk loading (spawn
+-        // generation inside initWorld) is only legal on that world's region thread, and blocking the
+-        // calling region thread would trip the Folia watchdog, so this tail is queued, not awaited.
++        // AethraSea Hybrid Engine - register the new world with the Folia regionized scheduler, then
++        // finish initialization asynchronously on the new world's OWN region ("0, 0"): never block the
++        // calling region thread, and never synchronously generate chunks here. Runtime world creation
++        // must NOT call MinecraftServer#initWorld's spawn search (PlayerSpawnFinder -> syncLoadNonFull)
++        // - it stalls on the new world's own region thread because the chunk machinery only makes
++        // progress while that region keeps ticking. So mark the world initialized (a pure data flag,
++        // thread-safe from any thread) and leave chunk generation to the region scheduler, which loads
++        // lazily. The world lifecycle events fire on the new world's own region so event listeners may
++        // read the world legally.
+         this.console.addLevel(serverLevel);
+         io.papermc.paper.threadedregions.RegionizedServer.getInstance().addWorld(serverLevel);
+         this.worlds.put(name.toLowerCase(Locale.ROOT), serverLevel.getWorld());
+ 
+-        final net.minecraft.server.MinecraftServer console = this.console;
++        serverLevel.serverLevelData.setInitialized(true);
++        serverLevel.setSpawnSettings(true);
++
+         io.papermc.paper.threadedregions.RegionizedServer.getInstance().taskQueue.queueTickTaskQueue(
+             serverLevel, 0, 0, () -> {
+-                console.initWorld(serverLevel, creator);
+-                serverLevel.setSpawnSettings(true);
++                new org.bukkit.event.world.WorldInitEvent(serverLevel.getWorld()).callEvent();
++                serverLevel.getWorld().setSpawnLocation(new org.bukkit.Location(serverLevel.getWorld(), 8, 64, 8));
+                 new org.bukkit.event.world.WorldLoadEvent(serverLevel.getWorld()).callEvent();
+             }
+         );
+diff --git a/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java b/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java
+index b5dd9e16d11488318ef09b3d1adb614b45332d0c..a196c5f3cabc1237f228fff0d4535e3afcf8ac76 100644
+--- a/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java
++++ b/src/main/java/org/bukkit/craftbukkit/block/CraftBlock.java
+@@ -80,11 +80,20 @@ public class CraftBlock implements Block {
+     }
+ 
+     public net.minecraft.world.level.block.state.BlockState getBlockState() {
+-        // Folia start - region threading
+         if (this.level instanceof ServerLevel serverWorld) {
++            // AethraSea Hybrid Engine - legacy plugin code running on the virtual main thread may read
++            // any world: reroute the read onto that world's own region and wait for the answer there
++            // (safe: the virtual main thread is never a Folia region/global thread).
++            if (io.papermc.paper.threadedregions.HybridRegionRead.isVirtualMainThread()) {
++                return io.papermc.paper.threadedregions.HybridRegionRead.onChunk(
++                    serverWorld, this.position.getX() >> 4, this.position.getZ() >> 4,
++                    () -> this.level.getBlockState(this.position)
++                );
++            }
++            // Folia start - region threading
+             ca.spottedleaf.moonrise.common.util.TickThread.ensureTickThread(serverWorld, this.position, "Cannot read world asynchronously");
++            // Folia end - region threading
+         }
+-        // Folia end - region threading
+         return this.level.getBlockState(this.position);
+     }
+ 

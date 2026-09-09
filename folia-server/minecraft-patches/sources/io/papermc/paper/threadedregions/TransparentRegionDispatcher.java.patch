@@ -1,0 +1,99 @@
+--- /dev/null
++++ b/io/papermc/paper/threadedregions/TransparentRegionDispatcher.java
+@@ -1,0 +_,96 @@
++package io.papermc.paper.threadedregions;
++
++import com.google.common.base.Preconditions;
++import org.bukkit.Bukkit;
++import org.bukkit.Location;
++import org.bukkit.World;
++import org.bukkit.entity.Entity;
++import org.bukkit.plugin.Plugin;
++
++/**
++ * AethraSea Hybrid Engine - transparent dispatcher for handing work to the correct region thread.
++ *
++ * <p>Legacy and native code alike may hand arbitrary work to the region that owns a chunk, entity,
++ * or the global region without reasoning about Folia's threading model. Commands are pooled to
++ * avoid allocation on hot handoff paths.</p>
++ */
++public final class TransparentRegionDispatcher {
++
++    private static final ObjectPool<ChunkCommand> CHUNK_COMMANDS = new ObjectPool<>(ChunkCommand::new, 256);
++
++    private TransparentRegionDispatcher() {
++    }
++
++    /**
++     * Executes the task on the region which owns the given chunk coordinates.
++     */
++    public static void executeOnRegion(final Plugin plugin, final World world, final int chunkX, final int chunkZ, final Runnable task) {
++        Preconditions.checkNotNull(plugin, "plugin");
++        Preconditions.checkNotNull(world, "world");
++        Preconditions.checkNotNull(task, "task");
++
++        final ChunkCommand command = CHUNK_COMMANDS.acquire();
++        command.set(task);
++        Bukkit.getRegionScheduler().execute(plugin, world, chunkX, chunkZ, command);
++    }
++
++    /**
++     * Executes the task on the region which owns the given location.
++     */
++    public static void executeOnRegion(final Plugin plugin, final Location location, final Runnable task) {
++        final World world = location.getWorld();
++        if (world == null) {
++            throw new IllegalStateException("Cannot execute a region task in an unloaded world");
++        }
++        executeOnRegion(plugin, world, location.getBlockX() >> 4, location.getBlockZ() >> 4, task);
++    }
++
++    /**
++     * Executes the task on the region which owns the given entity.
++     */
++    public static void executeOnEntity(final Plugin plugin, final Entity entity, final Runnable task) {
++        Preconditions.checkNotNull(plugin, "plugin");
++        Preconditions.checkNotNull(entity, "entity");
++        Preconditions.checkNotNull(task, "task");
++
++        // delay < 1 is treated as 1; a retired (removed) entity silently drops the piggybacked task
++        entity.getScheduler().execute(plugin, task, null, 1);
++    }
++
++    /**
++     * Executes the task on the global region thread.
++     */
++    public static void executeGlobal(final Plugin plugin, final Runnable task) {
++        Preconditions.checkNotNull(plugin, "plugin");
++        Preconditions.checkNotNull(task, "task");
++
++        Bukkit.getGlobalRegionScheduler().execute(plugin, task);
++    }
++
++    /**
++     * Executes the task on a shared async worker thread.
++     */
++    public static void executeAsync(final Plugin plugin, final Runnable task) {
++        Preconditions.checkNotNull(plugin, "plugin");
++        Preconditions.checkNotNull(task, "task");
++
++        Bukkit.getAsyncScheduler().runNow(plugin, scheduledTask -> task.run());
++    }
++
++    private static final class ChunkCommand implements Runnable {
++
++        private Runnable task;
++
++        private void set(final Runnable task) {
++            this.task = task;
++        }
++
++        @Override
++        public void run() {
++            final Runnable runnable = this.task;
++            this.task = null;
++            CHUNK_COMMANDS.release(this);
++            runnable.run();
++        }
++    }
++}

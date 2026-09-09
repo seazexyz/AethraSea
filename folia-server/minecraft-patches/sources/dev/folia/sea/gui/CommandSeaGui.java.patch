@@ -1,0 +1,71 @@
+--- /dev/null
++++ b/dev/folia/sea/gui/CommandSeaGui.java
+@@ -1,0 +_,68 @@
++package dev.folia.sea.gui;
++
++import dev.folia.sea.config.SeaConfig;
++import dev.folia.sea.io.SeaChunkIOPool;
++import dev.folia.sea.network.SeaPacketEventPipeline;
++import dev.folia.sea.pathfinding.SeaPathfindingPool;
++import net.kyori.adventure.text.Component;
++import net.kyori.adventure.text.format.NamedTextColor;
++import net.kyori.adventure.text.format.TextColor;
++import org.bukkit.Bukkit;
++import org.bukkit.ChatColor;
++import org.bukkit.command.Command;
++import org.bukkit.command.CommandSender;
++import org.bukkit.entity.Player;
++
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.List;
++
++public final class CommandSeaGui extends Command {
++
++    public CommandSeaGui() {
++        super("seagui", "Opens the UniqueCraft & Folia status GUI dashboard", "/folia gui or /sea gui", Arrays.asList("foliagui", "seastatus"));
++        this.setPermission("folia.command.gui");
++    }
++
++    @Override
++    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
++        if (!sender.hasPermission("folia.command.gui") && !sender.isOp()) {
++            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
++            return true;
++        }
++
++        if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
++            SeaConfig.loadConfig();
++            sender.sendMessage(ChatColor.GREEN + "[SeaConfig] sea.yml configuration reloaded successfully!");
++            return true;
++        }
++
++        if (sender instanceof Player player) {
++            SeaStatusGUI.open(player);
++            return true;
++        }
++
++        // Console fallback text output
++        sender.sendMessage(ChatColor.DARK_AQUA + "=== UniqueCraft / Folia Status Dashboard ===");
++        sender.sendMessage(ChatColor.GRAY + "• Brand: " + ChatColor.GOLD + SeaConfig.f3BrandName);
++        sender.sendMessage(ChatColor.GRAY + "• Online: " + ChatColor.GREEN + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers());
++        sender.sendMessage(ChatColor.GRAY + "• Async Chunk I/O: " + (SeaConfig.asyncChunkIo ? ChatColor.GREEN + "ENABLED (" + SeaChunkIOPool.getTotalTasksProcessed() + " tasks)" : ChatColor.RED + "DISABLED"));
++        sender.sendMessage(ChatColor.GRAY + "• Async Pathfinding: " + (SeaConfig.asyncPathfinding ? ChatColor.GREEN + "ENABLED (" + SeaPathfindingPool.getTotalPathsCalculated() + " paths, " + String.format("%.2f µs avg", SeaPathfindingPool.getAverageCalcTimeMicros()) + ")" : ChatColor.RED + "DISABLED"));
++        sender.sendMessage(ChatColor.GRAY + "• Smart Region Merging: " + (SeaConfig.smartRegionMerging ? ChatColor.GREEN + "ENABLED (" + SeaConfig.regionMergeHysteresisTicks + " ticks)" : ChatColor.RED + "DISABLED"));
++        sender.sendMessage(ChatColor.GRAY + "• Stasis Chamber Fix: " + (SeaConfig.stasisChamberFix ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"));
++        sender.sendMessage(ChatColor.GRAY + "• Packet Flood Limiter: " + (SeaConfig.packetFloodLimiter ? ChatColor.GREEN + "ENABLED (" + SeaConfig.maxPacketsPerSecond + " pkts/s)" : ChatColor.RED + "DISABLED"));
++        sender.sendMessage(ChatColor.GRAY + "• Graceful Region Recovery: " + (SeaConfig.gracefulRegionRecovery ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"));
++        long free = Runtime.getRuntime().freeMemory() / 1024 / 1024;
++        long total = Runtime.getRuntime().totalMemory() / 1024 / 1024;
++        sender.sendMessage(ChatColor.GRAY + "• Memory: " + ChatColor.YELLOW + (total - free) + "MB used / " + total + "MB total");
++        return true;
++    }
++
++    @Override
++    public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
++        if (args.length == 1) {
++            return Arrays.asList("gui", "reload");
++        }
++        return Collections.emptyList();
++    }
++}

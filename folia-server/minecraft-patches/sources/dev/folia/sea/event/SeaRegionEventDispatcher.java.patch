@@ -1,0 +1,57 @@
+--- /dev/null
++++ b/dev/folia/sea/event/SeaRegionEventDispatcher.java
+@@ -1,0 +_,54 @@
++package dev.folia.sea.event;
++
++import io.papermc.paper.threadedregions.RegionizedServer;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.level.ChunkPos;
++
++import java.util.concurrent.CompletableFuture;
++import java.util.function.Consumer;
++
++public final class SeaRegionEventDispatcher {
++
++    private SeaRegionEventDispatcher() {}
++
++    public record RegionContext(ServerLevel level, int chunkX, int chunkZ) {
++        public static RegionContext of(ServerLevel level, ChunkPos pos) {
++            return new RegionContext(level, pos.x(), pos.z());
++        }
++    }
++
++    public static CompletableFuture<Void> dispatchToRegion(RegionContext context, Runnable task) {
++        CompletableFuture<Void> future = new CompletableFuture<>();
++        RegionizedServer.getInstance().taskQueue.queueTickTaskQueue(
++                context.level(),
++                context.chunkX(),
++                context.chunkZ(),
++                () -> {
++                    try {
++                        task.run();
++                        future.complete(null);
++                    } catch (Throwable t) {
++                        future.completeExceptionally(t);
++                    }
++                }
++        );
++        return future;
++    }
++
++    public static <T> CompletableFuture<T> computeInRegion(RegionContext context, java.util.function.Supplier<T> supplier) {
++        CompletableFuture<T> future = new CompletableFuture<>();
++        RegionizedServer.getInstance().taskQueue.queueTickTaskQueue(
++                context.level(),
++                context.chunkX(),
++                context.chunkZ(),
++                () -> {
++                    try {
++                        future.complete(supplier.get());
++                    } catch (Throwable t) {
++                        future.completeExceptionally(t);
++                    }
++                }
++        );
++        return future;
++    }
++}

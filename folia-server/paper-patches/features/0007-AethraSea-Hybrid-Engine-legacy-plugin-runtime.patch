@@ -1,0 +1,279 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Tue, 8 Sep 2026 18:13:53 +0700
+Subject: [PATCH] AethraSea Hybrid Engine: legacy plugin runtime
+
+
+diff --git a/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java b/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..130e5d743974057605fcfe9769d6257dd7b70c88
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
+@@ -0,0 +1,111 @@
++package io.papermc.paper.plugin;
++
++import java.util.HashSet;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Set;
++import java.util.WeakHashMap;
++import org.bukkit.plugin.Plugin;
++
++/**
++ * AethraSea Hybrid Engine - core runtime classification of plugins.
++ *
++ * <p>Legacy single-threaded Paper/Spigot plugins (loaded from {@code plugins/paper}) are tracked so
++ * that the Folia region-threading guards can be relaxed for them, while native Folia region-aware
++ * plugins ({@code plugins/folia}) keep the full region threading model.</p>
++ */
++public final class HybridPluginRuntime {
++
++    // Set while scanning legacy plugin sources; consulted by FileProviderSource to attribute scans.
++    private static final ThreadLocal<Boolean> LEGACY_SOURCE = ThreadLocal.withInitial(() -> Boolean.FALSE);
++
++    private static final Object LOCK = new Object();
++    // Plugin names detected in legacy sources (normalized index-space), retained across reloads.
++    private static final Set<String> LEGACY_NAMES = new HashSet<>();
++    // Live plugin instances classified as legacy, keyed weakly so unloaded plugins can be GC'd.
++    private static final Map<Plugin, Boolean> LEGACY_INSTANCES = new WeakHashMap<>();
++
++    private HybridPluginRuntime() {
++    }
++
++    /**
++     * Marks whether the current thread is scanning a legacy plugin source.
++     *
++     * @return the previous value, for restore-in-finally patterns
++     */
++    public static boolean setLegacySource(final boolean legacy) {
++        final boolean prev = LEGACY_SOURCE.get();
++        LEGACY_SOURCE.set(legacy);
++        return prev;
++    }
++
++    /**
++     * Runs the given scanner with the legacy-source flag active on the current thread.
++     */
++    public static void inLegacySource(final Runnable scanner) {
++        final boolean prev = setLegacySource(true);
++        try {
++            scanner.run();
++        } finally {
++            setLegacySource(prev);
++        }
++    }
++
++    public static boolean isLegacySourceActive() {
++        return LEGACY_SOURCE.get();
++    }
++
++    /**
++     * Records a plugin name as legacy. Only takes effect while a legacy source scan is active.
++     */
++    public static void markLegacyName(final String pluginName) {
++        if (!isLegacySourceActive()) {
++            return;
++        }
++        synchronized (LOCK) {
++            LEGACY_NAMES.add(normalize(pluginName));
++        }
++    }
++
++    /**
++     * Called when a plugin instance has been created; classifies it as legacy if its name was
++     * detected during a legacy source scan.
++     */
++    public static void registerInstance(final Plugin plugin) {
++        if (!isLegacyName(plugin.getName())) {
++            return;
++        }
++        synchronized (LOCK) {
++            LEGACY_INSTANCES.put(plugin, Boolean.TRUE);
++        }
++    }
++
++    /**
++     * Returns whether the given plugin must run under the legacy single-threaded model.
++     *
++     * <p>A {@code null} owner represents internal scheduler bookkeeping, which is always
++     * legacy (it must run on the virtual main thread).</p>
++     */
++    public static boolean isLegacyPaperPlugin(final Plugin plugin) {
++        if (plugin == null) {
++            return true;
++        }
++        synchronized (LOCK) {
++            if (LEGACY_INSTANCES.containsKey(plugin)) {
++                return true;
++            }
++        }
++        return isLegacyName(plugin.getName());
++    }
++
++    private static boolean isLegacyName(final String pluginName) {
++        final String normalized = normalize(pluginName);
++        synchronized (LOCK) {
++            return LEGACY_NAMES.contains(normalized);
++        }
++    }
++
++    private static String normalize(final String name) {
++        return name.replace(' ', '_').toLowerCase(Locale.ENGLISH);
++    }
++}
+\ No newline at end of file
+diff --git a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+index 5741a60faba70da485053599c9370f0e27e868f4..9b34a6949af465f8b32d1c88d6e92c472b8f1c33 100644
+--- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
++++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+@@ -100,17 +100,30 @@ public class PluginInitializerManager {
+         // We have to load the bukkit configuration inorder to get the update folder location.
+         io.papermc.paper.plugin.PluginInitializerManager pluginSystem = io.papermc.paper.plugin.PluginInitializerManager.init(optionSet);
+ 
+-        // Register the default plugin directory
+-        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.pluginDirectoryPath());
+-
+-        // Register plugins from the flag
+-        @SuppressWarnings("unchecked")
+-        java.util.List<Path> files = ((java.util.List<File>) optionSet.valuesOf("add-plugin")).stream().map(File::toPath).toList();
+-        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, files);
++        // AethraSea Hybrid Engine start
++        // Legacy (single-threaded) sources: the plugin dir root (transition zone) and plugins/paper
++        io.papermc.paper.plugin.HybridPluginRuntime.inLegacySource(() ->
++            io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.pluginDirectoryPath())
++        );
++        io.papermc.paper.plugin.HybridPluginRuntime.inLegacySource(() ->
++            io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.pluginDirectoryPath().resolve("paper"))
++        );
++        // Native Folia source: plugins/folia
++        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.pluginDirectoryPath().resolve("folia"));
++
++        // Register plugins from the flag (Paper-style config flags are treated as legacy sources)
++        io.papermc.paper.plugin.HybridPluginRuntime.inLegacySource(() -> {
++            @SuppressWarnings("unchecked")
++            java.util.List<Path> files = ((java.util.List<File>) optionSet.valuesOf("add-plugin")).stream().map(File::toPath).toList();
++            io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.PluginFlagProviderSource.INSTANCE, files);
++        });
+ 
+         @SuppressWarnings("unchecked")
+         java.util.List<Path> dirs = ((java.util.List<File>) optionSet.valuesOf("add-plugin-dir")).stream().map(File::toPath).toList();
+-        dirs.forEach(pluginDir -> io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE_NO_CREATE, pluginDir));
++        dirs.forEach(pluginDir -> io.papermc.paper.plugin.HybridPluginRuntime.inLegacySource(() ->
++            io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE_NO_CREATE, pluginDir)
++        ));
++        // AethraSea Hybrid Engine end
+ 
+         final Set<String> paperPluginNames = new TreeSet<>();
+         final Set<String> legacyPluginNames = new TreeSet<>();
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+index 2a298ec2c95e9cc913926324dbbf192caa38b05f..80da08d2f6beebb6522ffa8422d496cd561ea832 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+@@ -36,15 +36,22 @@ class PaperEventManager {
+ 
+     // SimplePluginManager
+     public void callEvent(@NotNull Event event) {
+-        if (event.isAsynchronous() && this.server.isPrimaryThread()) {
+-            throw new IllegalStateException(event.getEventName() + " may only be triggered asynchronously.");
+-        } else if (!event.isAsynchronous() && !this.server.isPrimaryThread() && !this.server.isStopping()) {
+-            throw new IllegalStateException(event.getEventName() + " may only be triggered synchronously.");
+-        }
+-
+         HandlerList handlers = event.getHandlers();
+         RegisteredListener[] listeners = handlers.getRegisteredListeners();
+ 
++        // AethraSea Hybrid Engine start - event fast-path
++        // Defer the async/primary-thread validation until we know there is actually dispatch to do.
++        // Most high-frequency events (block/entity protection etc.) have no listeners; skipping the
++        // validation for them removes two thread-state queries and an exception guard per call.
++        if (listeners.length != 0) {
++            if (event.isAsynchronous() && this.server.isPrimaryThread()) {
++                throw new IllegalStateException(event.getEventName() + " may only be triggered asynchronously.");
++            } else if (!event.isAsynchronous() && !this.server.isPrimaryThread() && !this.server.isStopping()) {
++                throw new IllegalStateException(event.getEventName() + " may only be triggered synchronously.");
++            }
++        }
++        // AethraSea Hybrid Engine end
++
+         for (RegisteredListener registration : listeners) {
+             if (!registration.getPlugin().isEnabled()) {
+                 continue;
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+index 455e8c24d98fcd0ae0a349737a0e709a05ed9170..f4afc461b1cf8b26ff4efef972cf62ae341a8c9b 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+@@ -87,6 +87,9 @@ class PaperPluginInstanceManager {
+     public void loadPlugin(Plugin provided) {
+         PluginMeta configuration = provided.getPluginMeta();
+ 
++        // AethraSea Hybrid Engine - classify the instance as legacy (single-threaded) if required
++        io.papermc.paper.plugin.HybridPluginRuntime.registerInstance(provided);
++
+         this.plugins.add(provided);
+         this.lookupNames.put(configuration.getName().toLowerCase(java.util.Locale.ENGLISH), provided);
+         for (String providedPlugin : configuration.getProvidedPlugins()) {
+diff --git a/src/main/java/io/papermc/paper/plugin/provider/source/FileProviderSource.java b/src/main/java/io/papermc/paper/plugin/provider/source/FileProviderSource.java
+index 9661f033bbb2c00073f1c891e1411c2a9943a37a..38f11a1f2f0bfbb0fcba7fa5acc63baa3ad0bd71 100644
+--- a/src/main/java/io/papermc/paper/plugin/provider/source/FileProviderSource.java
++++ b/src/main/java/io/papermc/paper/plugin/provider/source/FileProviderSource.java
+@@ -81,6 +81,9 @@ public class FileProviderSource implements ProviderSource<Path, Path> {
+             return;
+         }
+ 
++        // AethraSea Hybrid Engine - attribute this plugin as legacy when an active legacy source scan is underway
++        io.papermc.paper.plugin.HybridPluginRuntime.markLegacyName(config.getName());
++
+         type.register(entrypointHandler, file, context);
+     }
+ 
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index 3fac32b420ce4ae74166eac43d38c51c1fd513cf..da22f40a3ab3282b12981e86c05f92b3eed38f6a 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -2342,7 +2342,7 @@ public final class CraftServer implements Server {
+ 
+     @Override
+     public boolean isPrimaryThread() {
+-        return ca.spottedleaf.moonrise.common.util.TickThread.isTickThread(); // Paper - rewrite chunk system
++        return ca.spottedleaf.moonrise.common.util.TickThread.isTickThread() || io.papermc.paper.threadedregions.PaperVirtualMainThread.isPrimaryThread(); // Paper - rewrite chunk system // AethraSea Hybrid Engine
+     }
+ 
+     @Override
+diff --git a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
+index c4dcddc4db02ed3641d05fae31ead7c13205f841..83ef76ff73ae8a663a3a301b5459e97e29458ae9 100644
+--- a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
++++ b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
+@@ -514,16 +514,30 @@ public class CraftScheduler implements BukkitScheduler {
+     }
+ 
+     protected CraftTask handle(final CraftTask task, final long delay) { // Paper
+-        if (true) throw new UnsupportedOperationException(); // Folia - region threading
++        // AethraSea Hybrid Engine start - allow legacy (single-threaded) and internal tasks, keep
++        // the Folia guard for native region-aware plugins.
++        if (!io.papermc.paper.plugin.HybridPluginRuntime.isLegacyPaperPlugin(task.getOwner())) {
++            throw new UnsupportedOperationException(); // Folia - region threading
++        }
+         // Paper start
+         if (!this.isAsyncScheduler && !task.isSync()) {
+             this.asyncScheduler.handle(task, delay);
+             return task;
+         }
+         // Paper end
+-        task.setNextRun(this.currentTick + delay);
+-        this.addTask(task);
++        if (this.isAsyncScheduler || io.papermc.paper.threadedregions.PaperVirtualMainThread.isVirtualMainThread()) {
++            task.setNextRun(this.currentTick + delay);
++            this.addTask(task);
++            return task;
++        }
++        // We are on an arbitrary region thread: hand the bookkeeping to the virtual main thread,
++        // which exclusively owns currentTick, temp and pending (see class javadoc).
++        io.papermc.paper.threadedregions.PaperVirtualMainThread.schedule(() -> {
++            task.setNextRun(this.currentTick + delay);
++            this.addTask(task);
++        });
+         return task;
++        // AethraSea Hybrid Engine end
+     }
+ 
+     private static void validate(final Plugin plugin, final Object task) {

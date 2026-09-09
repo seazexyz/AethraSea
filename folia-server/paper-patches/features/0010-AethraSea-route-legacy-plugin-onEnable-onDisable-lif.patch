@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Tue, 8 Sep 2026 19:13:56 +0700
+Subject: [PATCH] AethraSea: route legacy plugin onEnable/onDisable lifecycle
+ through the virtual main thread
+
+
+diff --git a/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java b/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
+index 49d5770c4fef50a6097541d502f8e9dd17a7ea9e..73bdb8418e39d77ab647e7ef7dec2e7997875d9f 100644
+--- a/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
++++ b/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
+@@ -98,6 +98,13 @@ public final class HybridPluginRuntime {
+         return isLegacyName(plugin.getName());
+     }
+ 
++    /**
++     * Alias for {@link #isLegacyPaperPlugin(Plugin)} used by the plugin lifecycle handlers.
++     */
++    public static boolean isLegacyPlugin(final Plugin plugin) {
++        return isLegacyPaperPlugin(plugin);
++    }
++
+     public static boolean isLegacyName(final String pluginName) {
+         final String normalized = normalize(pluginName);
+         synchronized (LOCK) {
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+index f4afc461b1cf8b26ff4efef972cf62ae341a8c9b..203afc0c90d70b4868839c1277519b078d73e13c 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+@@ -201,7 +201,15 @@ class PaperPluginInstanceManager {
+             } // Paper
+ 
+             try {
+-                jPlugin.setEnabled(true);
++                // AethraSea Hybrid Engine - run a legacy plugin's onEnable() on the virtual main thread
++                // so that Bukkit.isPrimaryThread() is true while it executes (single-threaded expectation).
++                final boolean legacy = io.papermc.paper.plugin.HybridPluginRuntime.isLegacyPlugin(jPlugin);
++                final Runnable enableTask = () -> jPlugin.setEnabled(true);
++                if (legacy) {
++                    io.papermc.paper.threadedregions.PaperVirtualMainThread.execute(enableTask);
++                } else {
++                    enableTask.run();
++                }
+             } catch (Throwable ex) {
+                 this.server.getLogger().log(Level.SEVERE, "Error occurred while enabling " + plugin.getPluginMeta().getDisplayName() + " (Is it up to date?)", ex);
+                 // Paper start - Disable plugins that fail to load
+@@ -236,7 +244,14 @@ class PaperPluginInstanceManager {
+ 
+             this.server.getPluginManager().callEvent(new PluginDisableEvent(plugin));
+             try {
+-                javaPlugin.setEnabled(false);
++                // AethraSea Hybrid Engine - run a legacy plugin's onDisable() on the virtual main thread
++                // so that Bukkit.isPrimaryThread() is true while it executes (single-threaded expectation).
++                final Runnable disableTask = () -> javaPlugin.setEnabled(false);
++                if (io.papermc.paper.plugin.HybridPluginRuntime.isLegacyPlugin(javaPlugin)) {
++                    io.papermc.paper.threadedregions.PaperVirtualMainThread.execute(disableTask);
++                } else {
++                    disableTask.run();
++                }
+             } catch (Throwable ex) {
+                 this.server.getLogger().log(Level.SEVERE, "Error occurred while disabling " + pluginName, ex);
+             }

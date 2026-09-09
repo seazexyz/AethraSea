@@ -1,0 +1,90 @@
+--- /dev/null
++++ b/dev/folia/sea/network/SeaPacketEventPipeline.java
+@@ -1,0 +_,87 @@
++package dev.folia.sea.network;
++
++import com.mojang.logging.LogUtils;
++import dev.folia.sea.config.SeaConfig;
++import net.minecraft.network.Connection;
++import net.minecraft.network.protocol.Packet;
++import org.slf4j.Logger;
++
++import java.util.List;
++import java.util.concurrent.CopyOnWriteArrayList;
++import java.util.concurrent.atomic.AtomicLong;
++import java.util.function.BiFunction;
++
++public final class SeaPacketEventPipeline {
++
++    private static final Logger LOGGER = LogUtils.getLogger();
++    private static final List<BiFunction<Connection, Packet<?>, Packet<?>>> INBOUND_LISTENERS = new CopyOnWriteArrayList<>();
++    private static final List<BiFunction<Connection, Packet<?>, Packet<?>>> OUTBOUND_LISTENERS = new CopyOnWriteArrayList<>();
++
++    private static final AtomicLong TOTAL_INBOUND_PACKETS = new AtomicLong(0);
++    private static final AtomicLong TOTAL_OUTBOUND_PACKETS = new AtomicLong(0);
++    private static final AtomicLong DROPPED_SPAM_PACKETS = new AtomicLong(0);
++
++    private SeaPacketEventPipeline() {}
++
++    public static void registerInboundInterceptor(BiFunction<Connection, Packet<?>, Packet<?>> interceptor) {
++        INBOUND_LISTENERS.add(interceptor);
++    }
++
++    public static void registerOutboundInterceptor(BiFunction<Connection, Packet<?>, Packet<?>> interceptor) {
++        OUTBOUND_LISTENERS.add(interceptor);
++    }
++
++    public static Packet<?> handleInbound(Connection connection, Packet<?> packet) {
++        TOTAL_INBOUND_PACKETS.incrementAndGet();
++        if (!SeaConfig.asyncPacketEvents || INBOUND_LISTENERS.isEmpty()) {
++            return packet;
++        }
++        Packet<?> current = packet;
++        for (BiFunction<Connection, Packet<?>, Packet<?>> listener : INBOUND_LISTENERS) {
++            try {
++                current = listener.apply(connection, current);
++                if (current == null) {
++                    return null; // Cancelled
++                }
++            } catch (Throwable t) {
++                LOGGER.error("[SeaPacketEventPipeline] Error in inbound packet listener", t);
++            }
++        }
++        return current;
++    }
++
++    public static Packet<?> handleOutbound(Connection connection, Packet<?> packet) {
++        TOTAL_OUTBOUND_PACKETS.incrementAndGet();
++        if (!SeaConfig.asyncPacketEvents || OUTBOUND_LISTENERS.isEmpty()) {
++            return packet;
++        }
++        Packet<?> current = packet;
++        for (BiFunction<Connection, Packet<?>, Packet<?>> listener : OUTBOUND_LISTENERS) {
++            try {
++                current = listener.apply(connection, current);
++                if (current == null) {
++                    return null; // Cancelled
++                }
++            } catch (Throwable t) {
++                LOGGER.error("[SeaPacketEventPipeline] Error in outbound packet listener", t);
++            }
++        }
++        return current;
++    }
++
++    public static void recordDroppedSpam() {
++        DROPPED_SPAM_PACKETS.incrementAndGet();
++    }
++
++    public static long getTotalInboundPackets() {
++        return TOTAL_INBOUND_PACKETS.get();
++    }
++
++    public static long getTotalOutboundPackets() {
++        return TOTAL_OUTBOUND_PACKETS.get();
++    }
++
++    public static long getDroppedSpamPackets() {
++        return DROPPED_SPAM_PACKETS.get();
++    }
++}

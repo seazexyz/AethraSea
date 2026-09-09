@@ -1,0 +1,38 @@
+--- /dev/null
++++ b/dev/folia/sea/scoreboard/SeaGlobalScoreboardSync.java
+@@ -1,0 +_,35 @@
++package dev.folia.sea.scoreboard;
++
++import com.mojang.logging.LogUtils;
++import net.minecraft.network.protocol.Packet;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.level.ServerPlayer;
++import org.slf4j.Logger;
++
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.atomic.AtomicLong;
++
++public final class SeaGlobalScoreboardSync {
++
++    private static final Logger LOGGER = LogUtils.getLogger();
++    private static final AtomicLong TOTAL_SYNC_BROADCASTS = new AtomicLong(0);
++
++    private SeaGlobalScoreboardSync() {}
++
++    public static void broadcastPacketToAll(Packet<?> packet) {
++        MinecraftServer server = MinecraftServer.getServer();
++        if (server == null || server.getPlayerList() == null) {
++            return;
++        }
++        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
++            if (player.connection != null) {
++                player.connection.send(packet);
++            }
++        }
++        TOTAL_SYNC_BROADCASTS.incrementAndGet();
++    }
++
++    public static long getTotalSyncBroadcasts() {
++        return TOTAL_SYNC_BROADCASTS.get();
++    }
++}

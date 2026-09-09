@@ -1,0 +1,74 @@
+--- /dev/null
++++ b/io/papermc/paper/threadedregions/ObjectPool.java
+@@ -1,0 +_,71 @@
++package io.papermc.paper.threadedregions;
++
++import java.util.concurrent.atomic.AtomicReference;
++import java.util.function.Supplier;
++
++/**
++ * AethraSea Hybrid Engine - lock-free bounded object pool (Treiber stack).
++ *
++ * <p>Reuses short-lived command objects in the region dispatcher to reduce allocation pressure on
++ * hot handoff paths.</p>
++ */
++final class ObjectPool<T> {
++
++    private static final class Node<T> {
++        final T value;
++        volatile Node<T> next;
++
++        private Node(final T value) {
++            this.value = value;
++        }
++    }
++
++    private final AtomicReference<Node<T>> head = new AtomicReference<>();
++    private final Supplier<T> factory;
++    private final int maxSize;
++    private int size; // guarded by this; only the borrowing thread may release, see below
++
++    ObjectPool(final Supplier<T> factory, final int maxSize) {
++        this.factory = factory;
++        this.maxSize = maxSize;
++    }
++
++    /**
++     * Borrows an element, allocating a new one if the pool is empty.
++     */
++    T acquire() {
++        final Node<T> current = this.head.get();
++        if (current == null) {
++            return this.factory.get();
++        }
++        final Node<T> next = current.next;
++        if (this.head.compareAndSet(current, next)) {
++            return current.value;
++        }
++        return this.factory.get();
++    }
++
++    /**
++     * Returns an element to the pool. Tolerates whatever thread releases, so the pool may grow up
++     * to maxSize.
++     */
++    void release(final T value) {
++        if (value == null) {
++            return;
++        }
++        int currentSize;
++        synchronized (this) {
++            currentSize = this.size;
++            if (currentSize >= this.maxSize) {
++                return;
++            }
++            this.size = currentSize + 1;
++        }
++        final Node<T> node = new Node<>(value);
++        Node<T> observed;
++        do {
++            observed = this.head.get();
++            node.next = observed;
++        } while (!this.head.compareAndSet(observed, node));
++    }
++}

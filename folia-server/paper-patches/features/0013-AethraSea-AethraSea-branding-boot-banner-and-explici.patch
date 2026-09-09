@@ -1,0 +1,201 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Wed, 9 Sep 2026 08:09:26 +0700
+Subject: [PATCH] AethraSea: AethraSea branding, boot banner, and explicit
+ not-supported logging for legacy plugin region access
+
+
+diff --git a/src/main/java/io/papermc/paper/PaperBootstrap.java b/src/main/java/io/papermc/paper/PaperBootstrap.java
+index 5d24f049fa88ed619c7793cf57525aca641a6df7..dd3b70be83c24918f5a6f92acfcc9cde03109efe 100644
+--- a/src/main/java/io/papermc/paper/PaperBootstrap.java
++++ b/src/main/java/io/papermc/paper/PaperBootstrap.java
+@@ -20,11 +20,27 @@ public final class PaperBootstrap {
+         SharedConstants.CHECK_DATA_FIXER_SCHEMA = Boolean.getBoolean("paper.updatingMinecraft");
+         // Paper end - Perf: Skip data fixer schema sanity check
+ 
++        printBanner();
+         getStartupVersionMessages().forEach(LOGGER::info);
+ 
+         Main.main(options);
+     }
+ 
++    private static void printBanner() {
++        final String banner =
++            "§f      _    ____  _   _  _____   ____    ____   _____  ____\n" +
++            "§7     / \\  |  _ \\| | | ||_   _| / ___|  |  _ \\ / _ \\ \\| ___|\n" +
++            "§7    / _ \\ | |_) | |_| |  | |   \\___ \\  | |_) ) |_| || |\n" +
++            "§7   / ___ \\|  _ <|  _  |  | |    ___) | |  __/|  _  / | |\n" +
++            "§7  /_/   \\_\\_| |_\\_| |_|  |_|   |____/  |_|   |_| \\_\\ |_|\n" +
++            "§7\n" +
++            "§7   Folia region threading §8»§f legacy plugin compatibility\n" +
++            "§7   Initializing AethraSea Hybrid Engine...";
++        for (final String line : banner.split("\n", -1)) {
++            LOGGER.info(line);
++        }
++    }
++
+     private static List<String> getStartupVersionMessages() {
+         final String javaSpecVersion = System.getProperty("java.specification.version");
+         final String javaVmName = System.getProperty("java.vm.name");
+diff --git a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
+index 10a0be7a4db1a51579d113d279af7a9effe7f438..895ba1baa53755af63576b9c4a1c805e30998f31 100644
+--- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
+@@ -44,7 +44,7 @@ public record ServerBuildInfoImpl(
+                 .map(Key::key)
+                 .orElse(Key.key("papermc", "folia")), // Folia
+             getManifestAttribute(manifest, ATTRIBUTE_BRAND_NAME)
+-                .orElse("Folia"), // Folia
++                .orElse("AethraSea"), // Folia // AethraSea Hybrid Engine
+             SharedConstants.getCurrentVersion().id(),
+             SharedConstants.getCurrentVersion().name(),
+             getManifestAttribute(manifest, ATTRIBUTE_BUILD_NUMBER)
+diff --git a/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java b/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
+index 73bdb8418e39d77ab647e7ef7dec2e7997875d9f..52d4e9351b501219e2ad33a2a6fe0e16ae728217 100644
+--- a/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
++++ b/src/main/java/io/papermc/paper/plugin/HybridPluginRuntime.java
+@@ -112,6 +112,35 @@ public final class HybridPluginRuntime {
+         }
+     }
+ 
++    // Message fragments that identify a failed access which the AethraSea Hybrid Engine cannot
++    // satisfy for a legacy plugin. Such operations must be performed by a Folia-region-aware build
++    // of the plugin instead.
++    private static final String[] UNSUPPORTED_MARKERS = {
++        "cannot read world asynchronously",
++        "main thread check",
++        "owning world's region thread",
++        "reads from the wrong region",
++        "world access from the wrong thread",
++        "aethrasea hybrid engine"
++    };
++
++    /**
++     * Returns whether the given throwable (including its cause chain) stems from an operation that
++     * the AethraSea Hybrid Engine does not support, such as a legacy plugin accessing world data in
++     * a way that Folia's region threading forbids.
++     */
++    public static boolean isUnsupportedOperation(final Throwable throwable) {
++        for (Throwable current = throwable; current != null; current = current.getCause()) {
++            final String message = String.valueOf(current.getMessage()).toLowerCase(Locale.ENGLISH);
++            for (final String marker : UNSUPPORTED_MARKERS) {
++                if (message.contains(marker)) {
++                    return true;
++                }
++            }
++        }
++        return false;
++    }
++
+     private static String normalize(final String name) {
+         return name.replace(' ', '_').toLowerCase(Locale.ENGLISH);
+     }
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+index 203afc0c90d70b4868839c1277519b078d73e13c..6cea14923795b3d1b15973c4b7e6a2a2b8ddc529 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+@@ -211,6 +211,13 @@ class PaperPluginInstanceManager {
+                     enableTask.run();
+                 }
+             } catch (Throwable ex) {
++                if (io.papermc.paper.plugin.HybridPluginRuntime.isUnsupportedOperation(ex)) {
++                    this.server.getLogger().severe(String.format(
++                        "[%s] Plugin '%s' performed an operation that the AethraSea Hybrid Engine does not support.%n" +
++                            "It may be reading or writing world/region data from a thread Folia does not permit.%n" +
++                            "Use a Folia-region-aware build of this plugin for this feature. (%s)",
++                        plugin.getPluginMeta().getDisplayName(), plugin.getPluginMeta().getDisplayName(), ex.getMessage()));
++                }
+                 this.server.getLogger().log(Level.SEVERE, "Error occurred while enabling " + plugin.getPluginMeta().getDisplayName() + " (Is it up to date?)", ex);
+                 // Paper start - Disable plugins that fail to load
+                 this.server.getPluginManager().disablePlugin(jPlugin);
+@@ -253,6 +260,11 @@ class PaperPluginInstanceManager {
+                     disableTask.run();
+                 }
+             } catch (Throwable ex) {
++                if (io.papermc.paper.plugin.HybridPluginRuntime.isUnsupportedOperation(ex)) {
++                    this.server.getLogger().severe(String.format(
++                        "[%s] Shutting down of plugin '%s' during an unsupported AethraSea Hybrid Engine operation failed. (%s)",
++                        pluginName, pluginName, ex.getMessage()));
++                }
+                 this.server.getLogger().log(Level.SEVERE, "Error occurred while disabling " + pluginName, ex);
+             }
+ 
+diff --git a/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java b/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java
+index 2190692114af5506a6dda8e6e612e02f86072182..2046018ba443758810313937dc61298e08427822 100644
+--- a/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java
++++ b/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java
+@@ -1,9 +1,13 @@
+ package io.papermc.paper.threadedregions;
+ 
+ import java.util.concurrent.CompletableFuture;
+-import java.util.concurrent.CompletionException;
++import java.util.concurrent.ExecutionException;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.TimeoutException;
+ import java.util.function.Supplier;
+ import net.minecraft.server.level.ServerLevel;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
+ 
+ /**
+  * AethraSea Hybrid Engine - bridge between the legacy "main thread" simulation and Folia's region
+@@ -16,9 +20,19 @@ import net.minecraft.server.level.ServerLevel;
+  * never a Folia region/global thread, so region threads keep ticking and nothing can deadlock or
+  * trip the watchdog. Native Folia threads are never rerouted - for them the access executes inline,
+  * preserving Folia's normal semantics (an illegal off-region access still throws).
++ *
++ * <p>The wait is bounded because region ticking has not started during plugin {@code onEnable} (it
++ * only begins once {@code RegionizedServer#init()} runs after worlds load): a routed read queued in
++ * that window would otherwise never complete. On timeout the supplier is executed inline, which
++ * reproduces the pre-hybrid behavior (the Folia main-thread check throws and the caller handles it)
++ * instead of hanging the boot.
+  */
+ public final class HybridRegionRead {
+ 
++    private static final Logger LOGGER = LoggerFactory.getLogger(HybridRegionRead.class);
++
++    private static final long MAX_WAIT_MILLIS = 750L;
++
+     private HybridRegionRead() {
+     }
+ 
+@@ -40,9 +54,18 @@ public final class HybridRegionRead {
+         });
+         RegionizedServer.getInstance().notifyTasks();
+         try {
+-            return gate.join();
+-        } catch (final CompletionException e) {
+-            throw unwrap(e);
++            return gate.get(MAX_WAIT_MILLIS, TimeUnit.MILLISECONDS);
++        } catch (final TimeoutException timeout) {
++            if (LOGGER.isWarnEnabled()) {
++                LOGGER.warn("AethraSea Hybrid Engine: {} read from legacy code at chunk ({}, {}) is not supported while the region scheduler has not started ticking yet; executing inline (the calling plugin must use a Folia-region-aware build for this access).",
++                    level.dimension().location(), chunkX, chunkZ);
++            }
++            return supplier.get();
++        } catch (final ExecutionException e) {
++            throw rethrow(e.getCause());
++        } catch (final InterruptedException e) {
++            Thread.currentThread().interrupt();
++            throw new RuntimeException(e);
+         }
+     }
+ 
+@@ -53,11 +76,11 @@ public final class HybridRegionRead {
+         });
+     }
+ 
+-    private static RuntimeException unwrap(final CompletionException e) {
+-        final Throwable cause = e.getCause() != null ? e.getCause() : e;
+-        if (cause instanceof RuntimeException) {
+-            return (RuntimeException) cause;
++    private static RuntimeException rethrow(final Throwable cause) {
++        final Throwable root = cause != null ? cause : new IllegalStateException("Unknown hybrid read failure");
++        if (root instanceof RuntimeException) {
++            return (RuntimeException) root;
+         }
+-        return new RuntimeException(cause);
++        return new RuntimeException(root);
+     }
+ }
+\ No newline at end of file

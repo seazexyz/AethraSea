@@ -1,0 +1,131 @@
+--- /dev/null
++++ b/io/papermc/paper/threadedregions/PaperVirtualMainThread.java
+@@ -1,0 +_,128 @@
++package io.papermc.paper.threadedregions;
++
++import com.mojang.logging.LogUtils;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.atomic.AtomicBoolean;
++import java.util.concurrent.locks.LockSupport;
++import org.bukkit.Bukkit;
++import org.bukkit.craftbukkit.CraftServer;
++import org.bukkit.craftbukkit.scheduler.CraftScheduler;
++import org.slf4j.Logger;
++
++/**
++ * AethraSea Hybrid Engine - the legacy single-threaded "main thread" simulator.
++ *
++ * <p>Legacy plugins expect a single thread that owns scheduler state and is reported by
++ * {@code Bukkit.isPrimaryThread()}. This thread advances {@link CraftScheduler#mainThreadHeartbeat()}
++ * at the 20 TPS cadence and executes bookkeeping/entry work handed over from region threads via a
++ * lock-free MPSC queue.</p>
++ *
++ * <p>Legacy sync scheduler tasks are executed from this thread so that {@code Bukkit.isPrimaryThread()}
++ * reads true while they run. The thread is a daemon, so it does not prevent the process from exiting.</p>
++ */
++public final class PaperVirtualMainThread {
++
++    private static final Logger LOGGER = LogUtils.getLogger();
++
++    private static final long TICK_INTERVAL_NANOS = TimeUnit.MILLISECONDS.toNanos(50L); // 20 TPS
++
++    private static final MpscQueue<Runnable> QUEUE = MpscQueue.create();
++    private static final AtomicBoolean STARTED = new AtomicBoolean();
++
++    private static final ThreadLocal<Boolean> ON_VIRTUAL_THREAD = ThreadLocal.withInitial(() -> Boolean.FALSE);
++    private static final java.util.concurrent.atomic.AtomicLong TICK_COUNTER = new java.util.concurrent.atomic.AtomicLong();
++
++    private PaperVirtualMainThread() {
++    }
++
++    public static void start() {
++        if (!STARTED.compareAndSet(false, true)) {
++            return;
++        }
++        final Thread thread = new Thread(PaperVirtualMainThread::runLoop, "Paper-Virtual-Main-Thread");
++        thread.setDaemon(true);
++        thread.start();
++    }
++
++    /**
++     * Hands a unit of work to the virtual main thread. Called from region threads for scheduler
++     * bookkeeping that must mutate main-thread-owned scheduler state.
++     */
++    public static void schedule(final Runnable runnable) {
++        start();
++        QUEUE.offer(runnable);
++    }
++
++    public static boolean isVirtualMainThread() {
++        return ON_VIRTUAL_THREAD.get();
++    }
++
++    /**
++     * Whether the current thread is (also) considered the legacy primary thread.
++     */
++    public static boolean isPrimaryThread() {
++        return isVirtualMainThread();
++    }
++
++    private static void runLoop() {
++        ON_VIRTUAL_THREAD.set(Boolean.TRUE);
++        long nextTickTime = System.nanoTime();
++
++        while (true) {
++            final boolean drained = drainQueue();
++
++            final long now = System.nanoTime();
++            if (now >= nextTickTime) {
++                do {
++                    heartbeat();
++                    nextTickTime += TICK_INTERVAL_NANOS;
++                } while (now >= nextTickTime + TICK_INTERVAL_NANOS);
++                // avoid a catch-up burst after a long stall
++                if (nextTickTime < now) {
++                    nextTickTime = now;
++                }
++                continue;
++            }
++
++            if (drained) {
++                // keep draining without sleeping while there was work
++                continue;
++            }
++
++            LockSupport.parkNanos(nextTickTime - now);
++        }
++    }
++
++    private static boolean drainQueue() {
++        boolean didAny = false;
++        for (Runnable task; (task = QUEUE.poll()) != null; ) {
++            didAny = true;
++            try {
++                task.run();
++            } catch (final Throwable throwable) {
++                LOGGER.error("Error running queued task on the virtual main thread", throwable);
++            }
++        }
++        return didAny;
++    }
++
++    private static void heartbeat() {
++        if (!STARTED.get()) {
++            return;
++        }
++        final CraftServer server = (CraftServer) Bukkit.getServer();
++        if (server == null || server.isStopping()) {
++            return;
++        }
++        try {
++            final CraftScheduler scheduler = server.getScheduler();
++            if (scheduler != null) {
++                scheduler.mainThreadHeartbeat();
++            }
++            // AethraSea Hybrid Engine - publish the read-only snapshot on the legacy tick boundary
++            SnapshotCache.capture(TICK_COUNTER.incrementAndGet());
++        } catch (final Throwable throwable) {
++            LOGGER.error("Error ticking the legacy scheduler on the virtual main thread", throwable);
++        }
++    }
++}

@@ -1,0 +1,57 @@
+--- /dev/null
++++ b/io/papermc/paper/threadedregions/MpscQueue.java
+@@ -1,0 +_,54 @@
++package io.papermc.paper.threadedregions;
++
++import java.util.concurrent.atomic.AtomicReference;
++
++/**
++ * AethraSea Hybrid Engine - lock-free multiple-producer single-consumer queue.
++ *
++ * <p>Dmitry Vyukov MPSC algorithm. Producers enqueue concurrently via {@link #offer}; a single
++ * consumer drains via {@link #poll}. Used to hand work to the legacy virtual main thread from
++ * arbitrary region threads.</p>
++ */
++final class MpscQueue<T> {
++
++    private static final class Node<T> {
++        final T value;
++        volatile Node<T> next;
++
++        private Node() {
++            this.value = null;
++        }
++
++        private Node(final T value) {
++            this.value = value;
++        }
++    }
++
++    private final AtomicReference<Node<T>> tail = new AtomicReference<>(new Node<>());
++    private volatile Node<T> head;
++
++    private MpscQueue() {
++        this.head = this.tail.get();
++    }
++
++    final void offer(final T value) {
++        final Node<T> node = new Node<>(value);
++        // Full fence via getAndSet; the prior tail's next is published by the volatile write below.
++        final Node<T> prev = this.tail.getAndSet(node);
++        prev.next = node;
++    }
++
++    final T poll() {
++        final Node<T> next = this.head.next;
++        if (next == null) {
++            return null;
++        }
++        this.head = next;
++        return next.value;
++    }
++
++    @SuppressWarnings("unchecked")
++    static <T> MpscQueue<T> create() {
++        return new MpscQueue<>();
++    }
++}

@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Wed, 9 Sep 2026 08:27:03 +0700
+Subject: [PATCH] AethraSea: fix HybridRegionRead warning logging to avoid
+ unavailable ResourceKey API
+
+
+diff --git a/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java b/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java
+index 2046018ba443758810313937dc61298e08427822..40b55da0cc8a09b938bb63b919526c62994438a0 100644
+--- a/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java
++++ b/src/main/java/io/papermc/paper/threadedregions/HybridRegionRead.java
+@@ -58,7 +58,7 @@ public final class HybridRegionRead {
+         } catch (final TimeoutException timeout) {
+             if (LOGGER.isWarnEnabled()) {
+                 LOGGER.warn("AethraSea Hybrid Engine: {} read from legacy code at chunk ({}, {}) is not supported while the region scheduler has not started ticking yet; executing inline (the calling plugin must use a Folia-region-aware build for this access).",
+-                    level.dimension().location(), chunkX, chunkZ);
++                    level, chunkX, chunkZ);
+             }
+             return supplier.get();
+         } catch (final ExecutionException e) {
