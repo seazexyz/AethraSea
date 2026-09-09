@@ -14,14 +14,15 @@
                 extend: {
                     colors: {
                         brand: {
-                            50: '#ecfdf5',
-                            100: '#d1fae5',
-                            500: '#10b981',
-                            600: '#059669',
-                            700: '#047857',
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            400: '#38bdf8',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
                         },
                         dark: {
-                            bg: '#090d14',
+                            bg: '#080d1a',
                             card: '#0f172a',
                             subtle: '#1e293b',
                             border: 'rgba(255, 255, 255, 0.08)',
@@ -46,7 +47,7 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #080c14;
+            background-color: #080d1a;
             color: #e2e8f0;
         }
 
@@ -59,7 +60,7 @@
         }
 
         .border-subtle-hover:hover {
-            border-color: rgba(16, 185, 129, 0.3);
+            border-color: rgba(56, 189, 248, 0.3);
         }
 
         /* Custom scrollbar */
@@ -68,37 +69,37 @@
             height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: #080c14;
+            background: #080d1a;
         }
         ::-webkit-scrollbar-thumb {
             background: #1e293b;
             border-radius: 3px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #10b981;
+            background: #0284c7;
         }
 
         .blur-gradient {
-            background: radial-gradient(circle at 50% -20%, rgba(16, 185, 129, 0.15), transparent 70%);
+            background: radial-gradient(circle at 50% -20%, rgba(2, 132, 199, 0.18), transparent 70%);
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-slate-950">
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-500 selection:text-white">
 
     <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-16 opacity-0 transition-all duration-300 pointer-events-none px-4 py-2.5 rounded-lg bg-brand-500 text-slate-950 font-medium text-xs shadow-xl flex items-center gap-2">
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-16 opacity-0 transition-all duration-300 pointer-events-none px-4 py-2.5 rounded-lg bg-brand-500 text-white font-medium text-xs shadow-xl flex items-center gap-2">
         <i class="fa-solid fa-check-circle text-sm"></i>
         <span id="toast-msg">Copied to clipboard</span>
     </div>
 
     <!-- Navigation Bar -->
-    <header class="sticky top-0 z-40 bg-[#080c14]/80 backdrop-blur-md border-b border-subtle">
+    <header class="sticky top-0 z-40 bg-[#080d1a]/80 backdrop-blur-md border-b border-subtle">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
             
             <!-- Logo & Brand -->
             <a href="#home" onclick="navigate('home')" class="flex items-center gap-2.5 font-semibold text-sm">
-                <div class="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-500">
-                    <i class="fa-solid fa-layer-group text-xs"></i>
+                <div class="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400">
+                    <i class="fa-solid fa-water text-xs"></i>
                 </div>
                 <span class="text-white font-bold tracking-tight">AethraSea</span>
                 <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-800/80 text-zinc-400 font-normal border border-white/5 font-mono">v26.2</span>
@@ -134,7 +135,7 @@
             <button onclick="navigate('home'); toggleMobileMenu();" class="block w-full text-left py-1.5 text-slate-300">Home</button>
             <button onclick="navigate('download'); toggleMobileMenu();" class="block w-full text-left py-1.5 text-slate-300">Download</button>
             <button onclick="navigate('docs'); toggleMobileMenu();" class="block w-full text-left py-1.5 text-slate-300">Docs</button>
-            <button onclick="openSearchModal(); toggleMobileMenu();" class="block w-full text-left py-1.5 text-brand-500">Search Documentation</button>
+            <button onclick="openSearchModal(); toggleMobileMenu();" class="block w-full text-left py-1.5 text-brand-400">Search Documentation</button>
         </div>
     </header>
 
@@ -151,13 +152,13 @@
                     
                     <!-- Left Hero Intro -->
                     <div class="lg:col-span-7 space-y-6">
-                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-500 text-xs font-medium">
-                            <i class="fa-solid fa-leaf text-xs"></i>
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs font-medium">
+                            <i class="fa-solid fa-water text-xs"></i>
                             <span>Folia 26.2 Core Fork</span>
                         </div>
 
                         <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white leading-tight">
-                            Regionized multithreading <br class="hidden sm:inline"> engineered for <span class="text-brand-500 italic font-normal">performance</span>.
+                            Regionized multithreading <br class="hidden sm:inline"> engineered for <span class="text-brand-400 italic font-normal">performance</span>.
                         </h1>
 
                         <p class="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl">
@@ -166,7 +167,7 @@
 
                         <!-- Action CTAs -->
                         <div class="flex flex-wrap items-center gap-3 pt-2">
-                            <button onclick="navigate('docs')" class="px-5 py-2.5 rounded-md bg-brand-500 hover:bg-brand-600 text-slate-950 font-medium text-xs transition-colors flex items-center gap-2">
+                            <button onclick="navigate('docs')" class="px-5 py-2.5 rounded-md bg-brand-500 hover:bg-brand-600 text-white font-medium text-xs transition-colors flex items-center gap-2">
                                 <span>Get Started</span>
                                 <i class="fa-solid fa-arrow-right text-[10px]"></i>
                             </button>
@@ -192,7 +193,7 @@
                         </div>
                     </div>
 
-                    <!-- Right Code/Terminal Box (Leaf Minimalist Style) -->
+                    <!-- Right Code/Terminal Box -->
                     <div class="lg:col-span-5">
                         <div class="rounded-xl border border-subtle bg-dark-card overflow-hidden shadow-2xl">
                             <!-- Window Header -->
@@ -203,27 +204,27 @@
                                     <div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
                                     <span class="text-[11px] code-font text-slate-400 ml-2">sea.yml</span>
                                 </div>
-                                <span class="text-[10px] code-font px-2 py-0.5 rounded bg-brand-500/10 text-brand-500 border border-brand-500/20">CONFIG SPEC</span>
+                                <span class="text-[10px] code-font px-2 py-0.5 rounded bg-brand-500/10 text-brand-400 border border-brand-500/20">CONFIG SPEC</span>
                             </div>
 
                             <!-- Config Preview Text -->
-                            <div class="p-4 code-font text-xs leading-relaxed text-slate-300 overflow-x-auto bg-[#070a10]">
+                            <div class="p-4 code-font text-xs leading-relaxed text-slate-300 overflow-x-auto bg-[#060a12]">
 <pre><code class="text-slate-400">performance:
-  smart-region-merging: <span class="text-brand-500">true</span>
-  async-chunk-io: <span class="text-brand-500">true</span>
-  async-pathfinding: <span class="text-brand-500">true</span>
+  smart-region-merging: <span class="text-brand-400">true</span>
+  async-chunk-io: <span class="text-brand-400">true</span>
+  async-pathfinding: <span class="text-brand-400">true</span>
   pathfinding-threads: <span class="text-amber-400">4</span>
   chunk-system:
-    parallel-chunk-loading: <span class="text-brand-500">true</span>
+    parallel-chunk-loading: <span class="text-brand-400">true</span>
     chunk-loading-parallelism: <span class="text-amber-400">0</span>
 
 network:
-  packet-flood-limiter: <span class="text-brand-500">true</span>
+  packet-flood-limiter: <span class="text-brand-400">true</span>
   max-packets-per-second: <span class="text-amber-400">500</span></code></pre>
                             </div>
                             <div class="px-4 py-2 bg-slate-950/40 border-t border-subtle text-[11px] text-slate-500 flex justify-between font-mono">
                                 <span>Default Engine Profile</span>
-                                <a href="#docs" onclick="navigate('docs')" class="text-brand-500 hover:underline">View Full Spec →</a>
+                                <a href="#docs" onclick="navigate('docs')" class="text-brand-400 hover:underline">View Full Spec →</a>
                             </div>
                         </div>
                     </div>
@@ -236,7 +237,7 @@ network:
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     
                     <div class="mb-10 max-w-2xl space-y-2">
-                        <span class="text-xs font-semibold uppercase tracking-wider text-brand-500">Engine Pillars</span>
+                        <span class="text-xs font-semibold uppercase tracking-wider text-brand-400">Engine Pillars</span>
                         <h2 class="text-xl sm:text-2xl font-semibold text-white">Designed for high entity & chunk density</h2>
                     </div>
 
@@ -244,7 +245,7 @@ network:
                         
                         <!-- Feature 1 -->
                         <div class="p-6 rounded-xl bg-dark-card border border-subtle border-subtle-hover transition-all space-y-3">
-                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-500 text-sm">
+                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-400 text-sm">
                                 <i class="fa-solid fa-microchip"></i>
                             </div>
                             <h3 class="text-sm font-bold text-white">Parallel Moonrise Engine</h3>
@@ -255,7 +256,7 @@ network:
 
                         <!-- Feature 2 -->
                         <div class="p-6 rounded-xl bg-dark-card border border-subtle border-subtle-hover transition-all space-y-3">
-                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-500 text-sm">
+                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-400 text-sm">
                                 <i class="fa-solid fa-route"></i>
                             </div>
                             <h3 class="text-sm font-bold text-white">Async Pathfinding Pool</h3>
@@ -266,7 +267,7 @@ network:
 
                         <!-- Feature 3 -->
                         <div class="p-6 rounded-xl bg-dark-card border border-subtle border-subtle-hover transition-all space-y-3">
-                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-500 text-sm">
+                            <div class="w-9 h-9 rounded-md bg-slate-800/80 border border-white/5 flex items-center justify-center text-brand-400 text-sm">
                                 <i class="fa-solid fa-shield-halved"></i>
                             </div>
                             <h3 class="text-sm font-bold text-white">Netty Packet Pipeline</h3>
@@ -287,7 +288,7 @@ network:
         <div id="view-download" class="hidden py-12 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="space-y-3 mb-8">
                 <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-mono">
-                    <i class="fa-solid fa-download text-brand-500"></i>
+                    <i class="fa-solid fa-download text-brand-400"></i>
                     <span>Official Release Binaries</span>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-semibold text-white">Download AethraSea Core</h1>
@@ -300,7 +301,7 @@ network:
                 <!-- Main Release Card -->
                 <div class="p-6 rounded-xl bg-dark-card border border-subtle space-y-5">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-brand-500 font-mono">STABLE RELEASE</span>
+                        <span class="text-xs font-semibold text-brand-400 font-mono">STABLE RELEASE</span>
                         <span class="text-[11px] text-slate-500 font-mono">Folia 26.2 Base</span>
                     </div>
 
@@ -315,7 +316,7 @@ network:
                         <div class="text-slate-500 truncate">SHA-256: 8f2a10b49c...e81c</div>
                     </div>
 
-                    <a href="https://github.com/seazexyz/AethraSea/releases" target="_blank" rel="noopener" class="w-full py-2.5 rounded bg-brand-500 hover:bg-brand-600 text-slate-950 font-semibold text-xs transition-colors flex items-center justify-center gap-2">
+                    <a href="https://github.com/seazexyz/AethraSea/releases" target="_blank" rel="noopener" class="w-full py-2.5 rounded bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2">
                         <i class="fa-solid fa-download"></i>
                         <span>Download Jar Binary</span>
                     </a>
@@ -343,8 +344,8 @@ network:
 
             <!-- Notes -->
             <div class="mt-8 p-4 rounded-lg bg-slate-900/50 border border-subtle text-xs text-slate-400 space-y-1">
-                <span class="font-bold text-slate-200"><i class="fa-solid fa-circle-info text-brand-500 mr-1.5"></i> Deployment Notice:</span>
-                <p>When upgrading server jar binaries, remember to remove the local <code class="text-brand-500 code-font">versions/</code> directory to force Paperclip to extract updated patch hashes.</p>
+                <span class="font-bold text-slate-200"><i class="fa-solid fa-circle-info text-brand-400 mr-1.5"></i> Deployment Notice:</span>
+                <p>When upgrading server jar binaries, remember to remove the local <code class="text-brand-400 code-font">versions/</code> directory to force Paperclip to extract updated patch hashes.</p>
             </div>
         </div>
 
@@ -363,7 +364,7 @@ network:
                         <!-- Group 1: Introduction -->
                         <div class="space-y-1">
                             <div class="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">Introduction</div>
-                            <button onclick="showDocSection('docs-getting-started', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-500 border border-brand-500/20">Getting Started</button>
+                            <button onclick="showDocSection('docs-getting-started', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20">Getting Started</button>
                             <button onclick="showDocSection('docs-faq', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">Frequently Asked Questions</button>
                             <button onclick="showDocSection('docs-useful-sites', this)" class="doc-nav-btn w-full text-left px-3 py-2 rounded-md text-slate-400 hover:bg-slate-900 hover:text-white transition-colors">Useful Websites</button>
                         </div>
@@ -402,20 +403,9 @@ network:
                     <!-- Section 1: Getting Started -->
                     <div id="docs-getting-started" class="doc-content space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / getting-started</span>
+                            <span class="text-xs font-mono text-brand-400">docs / getting-started</span>
                             <h1 class="text-2xl font-semibold text-white mt-1">Getting Started with AethraSea</h1>
                             <p class="text-xs text-slate-400 mt-1">Quick installation guide and core deployment overview.</p>
-                        </div>
-
-                        <!-- Callout Box (Leaf Style) -->
-                        <div class="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-start gap-3">
-                            <i class="fa-solid fa-triangle-exclamation text-amber-400 text-base mt-0.5"></i>
-                            <div class="space-y-1 text-xs">
-                                <span class="font-bold text-amber-400 uppercase tracking-wide">Work in Progress</span>
-                                <p class="text-slate-300 leading-relaxed">
-                                    This documentation site is under active development. For live support or technical queries, feel free to join our community channels on Discord or QQ.
-                                </p>
-                            </div>
                         </div>
 
                         <div class="space-y-4 text-xs text-slate-300 leading-relaxed">
@@ -429,21 +419,21 @@ network:
                             </ul>
 
                             <h3 class="text-sm font-bold text-white mt-6">First Launch</h3>
-                            <p>Place <code class="text-brand-500 code-font">aethrasea-paperclip-26.2.jar</code> into an empty directory and execute:</p>
+                            <p>Place <code class="text-brand-400 code-font">aethrasea-paperclip-26.2.jar</code> into an empty directory and execute:</p>
                             
                             <div class="p-3 bg-slate-950 rounded border border-subtle code-font text-slate-200 flex justify-between items-center">
                                 <code>java -Xms4G -Xmx4G -jar aethrasea-paperclip-26.2.jar --nogui</code>
                                 <button onclick="copyToClipboard('java -Xms4G -Xmx4G -jar aethrasea-paperclip-26.2.jar --nogui')" class="text-slate-400 hover:text-white"><i class="fa-regular fa-copy"></i></button>
                             </div>
 
-                            <p>On initial boot, AethraSea will automatically extract libraries and generate the <code class="text-brand-500 code-font">sea.yml</code> configuration file.</p>
+                            <p>On initial boot, AethraSea will automatically extract libraries and generate the <code class="text-brand-400 code-font">sea.yml</code> configuration file.</p>
                         </div>
                     </div>
 
                     <!-- Section: FAQ -->
                     <div id="docs-faq" class="doc-content hidden space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / faq</span>
+                            <span class="text-xs font-mono text-brand-400">docs / faq</span>
                             <h1 class="text-2xl font-semibold text-white mt-1">Frequently Asked Questions</h1>
                             <p class="text-xs text-slate-400 mt-1">Common questions regarding compatibility, performance, and plugins.</p>
                         </div>
@@ -463,9 +453,9 @@ network:
                     <!-- Section: Useful Sites -->
                     <div id="docs-useful-sites" class="doc-content hidden space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / useful-sites</span>
-                            <h1 class="text-2xl font-semibold text-white mt-1">Useful Websites & Community</h1>
-                            <p class="text-xs text-slate-400 mt-1">External resources, repositories, and community groups.</p>
+                            <span class="text-xs font-mono text-brand-400">docs / useful-sites</span>
+                            <h1 class="text-2xl font-semibold text-white mt-1">Useful Websites & Resources</h1>
+                            <p class="text-xs text-slate-400 mt-1">External resources and repositories.</p>
                         </div>
 
                         <div class="grid sm:grid-cols-2 gap-4 text-xs">
@@ -476,26 +466,19 @@ network:
                                 </div>
                                 <p class="text-slate-400 text-[11px]">Official source code, issues tracker, and releases.</p>
                             </a>
-                            <a href="https://discord.com" target="_blank" rel="noopener" class="p-4 rounded-lg bg-slate-900 border border-subtle hover:border-brand-500/40 transition-colors block space-y-1">
-                                <div class="font-bold text-white flex items-center justify-between">
-                                    <span>Discord Server</span>
-                                    <i class="fa-brands fa-discord text-slate-400"></i>
-                                </div>
-                                <p class="text-slate-400 text-[11px]">Community chat, announcements, and developer support.</p>
-                            </a>
                         </div>
                     </div>
 
                     <!-- Section 2: sea.yml Specification -->
                     <div id="docs-config" class="doc-content hidden space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / sea.yml</span>
+                            <span class="text-xs font-mono text-brand-400">docs / sea.yml</span>
                             <h1 class="text-2xl font-semibold text-white mt-1">sea.yml Configuration Reference</h1>
                             <p class="text-xs text-slate-400 mt-1">Complete configuration schema and description of values.</p>
                         </div>
 
                         <div class="space-y-4 text-xs text-slate-300">
-                            <div class="p-4 bg-[#070a10] rounded-lg border border-subtle code-font leading-relaxed overflow-x-auto text-slate-300">
+                            <div class="p-4 bg-[#060a12] rounded-lg border border-subtle code-font leading-relaxed overflow-x-auto text-slate-300">
 <pre><span class="text-slate-500"># AethraSea Core Configuration</span>
 brand:
   f3-brand-name: 'AethraSea'
@@ -525,7 +508,7 @@ security:
                     <!-- Section: JVM Flags -->
                     <div id="docs-jvm-flags" class="doc-content hidden space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / jvm-flags</span>
+                            <span class="text-xs font-mono text-brand-400">docs / jvm-flags</span>
                             <h1 class="text-2xl font-semibold text-white mt-1">Recommended JVM Flags</h1>
                             <p class="text-xs text-slate-400 mt-1">Optimized garbage collection parameters for Java 21+.</p>
                         </div>
@@ -542,26 +525,26 @@ security:
                     <!-- Section 3: Package Specs -->
                     <div id="docs-architecture" class="doc-content hidden space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / architecture</span>
+                            <span class="text-xs font-mono text-brand-400">docs / architecture</span>
                             <h1 class="text-2xl font-semibold text-white mt-1">Package Architecture</h1>
                             <p class="text-xs text-slate-400 mt-1">Internal package separation under dev.folia.sea.*</p>
                         </div>
 
                         <div class="grid sm:grid-cols-2 gap-4 text-xs">
                             <div class="p-4 rounded-lg bg-slate-900 border border-subtle space-y-1">
-                                <span class="font-mono text-brand-500 font-bold">dev.folia.sea.config</span>
+                                <span class="font-mono text-brand-400 font-bold">dev.folia.sea.config</span>
                                 <p class="text-slate-400">Manages sea.yml lifecycle and Moonrise executor setup.</p>
                             </div>
                             <div class="p-4 rounded-lg bg-slate-900 border border-subtle space-y-1">
-                                <span class="font-mono text-brand-500 font-bold">dev.folia.sea.network</span>
+                                <span class="font-mono text-brand-400 font-bold">dev.folia.sea.network</span>
                                 <p class="text-slate-400">Pre-dispatch packet flood filtering and payload sanity checks.</p>
                             </div>
                             <div class="p-4 rounded-lg bg-slate-900 border border-subtle space-y-1">
-                                <span class="font-mono text-brand-500 font-bold">dev.folia.sea.pathfinding</span>
+                                <span class="font-mono text-brand-400 font-bold">dev.folia.sea.pathfinding</span>
                                 <p class="text-slate-400">Dedicated executor pool for entity navigation.</p>
                             </div>
                             <div class="p-4 rounded-lg bg-slate-900 border border-subtle space-y-1">
-                                <span class="font-mono text-brand-500 font-bold">dev.folia.sea.monitor</span>
+                                <span class="font-mono text-brand-400 font-bold">dev.folia.sea.monitor</span>
                                 <p class="text-slate-400">1 Hz tick performance sampling and BossBar output.</p>
                             </div>
                         </div>
@@ -570,22 +553,22 @@ security:
                     <!-- Section 4: HUD & GUI Diagnostics -->
                     <div id="docs-hud" class="doc-content hidden space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / diagnostics</span>
+                            <span class="text-xs font-mono text-brand-400">docs / diagnostics</span>
                             <h1 class="text-2xl font-semibold text-white mt-1">In-Game Diagnostics</h1>
                             <p class="text-xs text-slate-400 mt-1">BossBars and administrative dashboard GUI commands.</p>
                         </div>
 
                         <div class="space-y-3 text-xs text-slate-300">
                             <div class="p-3 bg-slate-900 border border-subtle rounded space-y-1 font-mono">
-                                <span class="text-brand-500">/tpsbar [on|off]</span>
+                                <span class="text-brand-400">/tpsbar [on|off]</span>
                                 <p class="text-slate-400 text-[11px]">Toggles real-time region MSPT and median TPS BossBar.</p>
                             </div>
                             <div class="p-3 bg-slate-900 border border-subtle rounded space-y-1 font-mono">
-                                <span class="text-brand-500">/rambar [on|off]</span>
+                                <span class="text-brand-400">/rambar [on|off]</span>
                                 <p class="text-slate-400 text-[11px]">Displays live JVM heap memory allocation.</p>
                             </div>
                             <div class="p-3 bg-slate-900 border border-subtle rounded space-y-1 font-mono">
-                                <span class="text-brand-500">/seagui</span>
+                                <span class="text-brand-400">/seagui</span>
                                 <p class="text-slate-400 text-[11px]">Opens administrative 54-slot diagnostic inventory menu.</p>
                             </div>
                         </div>
@@ -594,7 +577,7 @@ security:
                     <!-- Section 5: Gradle Build Workflow -->
                     <div id="docs-build" class="doc-content hidden space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / build</span>
+                            <span class="text-xs font-mono text-brand-400">docs / build</span>
                             <h1 class="text-2xl font-semibold text-white mt-1">Gradle Build Instructions</h1>
                             <p class="text-xs text-slate-400 mt-1">Steps for applying patches and compiling the core jar.</p>
                         </div>
@@ -615,14 +598,14 @@ security:
                     <!-- Section: API Guide -->
                     <div id="docs-api-guide" class="doc-content hidden space-y-6">
                         <div class="border-b border-subtle pb-4">
-                            <span class="text-xs font-mono text-brand-500">docs / api</span>
+                            <span class="text-xs font-mono text-brand-400">docs / api</span>
                             <h1 class="text-2xl font-semibold text-white mt-1">API Usage Guide</h1>
                             <p class="text-xs text-slate-400 mt-1">Developing plugins against AethraSea region APIs.</p>
                         </div>
 
                         <div class="space-y-3 text-xs text-slate-300">
                             <p>AethraSea exposes region scheduler hooks identical to standard Folia APIs. Always dispatch region-specific entity and block modifications using the appropriate scheduler:</p>
-                            <div class="p-3 bg-[#070a10] rounded border border-subtle code-font text-slate-300">
+                            <div class="p-3 bg-[#060a12] rounded border border-subtle code-font text-slate-300">
 <pre><code class="text-slate-400">Bukkit.getRegionScheduler().run(plugin, location, task -> {
     <span class="text-slate-500">// Region-safe execution here</span>
 });</code></pre>
@@ -675,8 +658,8 @@ security:
     <footer class="border-t border-subtle py-8 bg-slate-950/60 text-xs text-slate-400 font-mono">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-2">
-                <div class="w-5 h-5 rounded bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-500 text-[10px]">
-                    <i class="fa-solid fa-layer-group"></i>
+                <div class="w-5 h-5 rounded bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400 text-[10px]">
+                    <i class="fa-solid fa-water"></i>
                 </div>
                 <span>AethraSea Engine (seadomine.com)</span>
             </div>
@@ -714,7 +697,7 @@ security:
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Toggle Documentation Sub-sections (Fixed event.currentTarget bug)
+        // Toggle Documentation Sub-sections
         function showDocSection(sectionId, btnElem) {
             const sections = document.querySelectorAll('.doc-content');
             sections.forEach(s => s.classList.add('hidden'));
@@ -728,10 +711,10 @@ security:
             });
 
             if (btnElem) {
-                btnElem.className = "doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-500 border border-brand-500/20 font-medium";
+                btnElem.className = "doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20 font-medium";
             } else {
                 const activeBtn = Array.from(navBtns).find(b => b.getAttribute('onclick')?.includes(sectionId));
-                if (activeBtn) activeBtn.className = "doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-500 border border-brand-500/20 font-medium";
+                if (activeBtn) activeBtn.className = "doc-nav-btn w-full text-left px-3 py-2 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20 font-medium";
             }
         }
 
