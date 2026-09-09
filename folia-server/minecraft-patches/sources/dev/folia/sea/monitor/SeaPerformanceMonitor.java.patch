@@ -1,0 +1,247 @@
+--- /dev/null
++++ b/dev/folia/sea/monitor/SeaPerformanceMonitor.java
+@@ -1,0 +_,244 @@
++package dev.folia.sea.monitor;
++
++import ca.spottedleaf.common.time.TickData;
++import dev.folia.sea.config.SeaConfig;
++import io.papermc.paper.threadedregions.ThreadedRegionizer;
++import io.papermc.paper.threadedregions.commands.CommandUtil;
++import io.papermc.paper.threadedregions.TickRegions;
++import net.kyori.adventure.text.Component;
++import net.kyori.adventure.text.format.NamedTextColor;
++import net.kyori.adventure.text.format.TextColor;
++import net.minecraft.server.MinecraftServer;
++import org.bukkit.Bukkit;
++import org.bukkit.World;
++import org.bukkit.craftbukkit.CraftWorld;
++import org.bukkit.entity.Player;
++
++import java.text.DecimalFormat;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Set;
++import java.util.UUID;
++import java.util.concurrent.ConcurrentHashMap;
++
++/**
++ * AethraSea real-time performance HUD.
++ *
++ * <p>Ticked once per second from the global region thread. Pushes an action bar to every player
++ * that toggled {@code /tpsbar} or {@code /rambar}, and optionally barks a warning to ops whenever
++ * the server median TPS drops below or the heap usage exceeds the configured sea.yml thresholds.</p>
++ */
++public final class SeaPerformanceMonitor {
++
++    private static final Set<UUID> TPS_BAR_USERS = ConcurrentHashMap.newKeySet();
++    private static final Set<UUID> RAM_BAR_USERS = ConcurrentHashMap.newKeySet();
++
++    private static final DecimalFormat TWO_DEC = new DecimalFormat("#,##0.00");
++    private static final DecimalFormat ONE_DEC = new DecimalFormat("#,##0.0");
++    private static final DecimalFormat NO_DEC = new DecimalFormat("#,##0");
++
++    private static long tickCount;
++
++    private SeaPerformanceMonitor() {
++    }
++
++    // ---- subscription management ----------------------------------------------------------
++
++    public static boolean isTpsBarEnabled(final UUID uuid) {
++        return TPS_BAR_USERS.contains(uuid);
++    }
++
++    public static boolean isRamBarEnabled(final UUID uuid) {
++        return RAM_BAR_USERS.contains(uuid);
++    }
++
++    public static void setTpsBarEnabled(final UUID uuid, final boolean enabled) {
++        if (enabled) {
++            TPS_BAR_USERS.add(uuid);
++        } else {
++            TPS_BAR_USERS.remove(uuid);
++        }
++    }
++
++    public static void setRamBarEnabled(final UUID uuid, final boolean enabled) {
++        if (enabled) {
++            RAM_BAR_USERS.add(uuid);
++        } else {
++            RAM_BAR_USERS.remove(uuid);
++        }
++    }
++
++    // ---- periodic tick --------------------------------------------------------------------
++
++    /**
++     * Called from the global region tick. Does the actual work at a 1 Hz cadence.
++     */
++    public static void tick() {
++        final long currentTick = ++tickCount;
++        if ((currentTick % 20) != 0) {
++            return;
++        }
++        if (TPS_BAR_USERS.isEmpty() && RAM_BAR_USERS.isEmpty() && !SeaConfig.isMonitorWarningEnabled()) {
++            return;
++        }
++
++        final long now = System.nanoTime();
++        final TpsSnapshot tps = computeServerTps(now);
++
++        final Runtime rt = Runtime.getRuntime();
++        final long usedMb = (rt.totalMemory() - rt.freeMemory()) >> 20;
++        final long maxMb = Math.max(usedMb, rt.maxMemory() >> 20);
++        final int ramPercent = (int) (maxMb == 0 ? 0 : (usedMb * 100.0 / maxMb));
++
++        pushBars(tps, usedMb, maxMb, ramPercent);
++        pushWarnings(tps, usedMb, maxMb, ramPercent);
++    }
++
++    private static void pushBars(final TpsSnapshot tps, final long usedMb, final long maxMb, final int ramPercent) {
++        if (!TPS_BAR_USERS.isEmpty() && MinecraftServer.getServer() != null) {
++            final Component tpsBar = buildTpsBar(tps);
++            for (final Player player : Bukkit.getOnlinePlayers()) {
++                if (TPS_BAR_USERS.contains(player.getUniqueId())) {
++                    player.sendActionBar(tpsBar);
++                }
++            }
++        }
++
++        if (!RAM_BAR_USERS.isEmpty()) {
++            final Component ramBar = buildRamBar(usedMb, maxMb, ramPercent);
++            for (final Player player : Bukkit.getOnlinePlayers()) {
++                if (RAM_BAR_USERS.contains(player.getUniqueId())) {
++                    player.sendActionBar(ramBar);
++                }
++            }
++        }
++    }
++
++    private static void pushWarnings(final TpsSnapshot tps, final long usedMb, final long maxMb, final int ramPercent) {
++        if (!SeaConfig.isMonitorWarningEnabled()) {
++            return;
++        }
++        final boolean lowTps = tps.median < SeaConfig.monitorWarnTpsThreshold;
++        final boolean highRam = ramPercent >= SeaConfig.monitorWarnRamPercent;
++        if (!lowTps && !highRam) {
++            return;
++        }
++
++        final Component warn;
++        if (lowTps && highRam) {
++            warn = Component.text()
++                .append(Component.text("\u26a0 ", NamedTextColor.DARK_RED))
++                .append(Component.text("WARNING ", NamedTextColor.DARK_RED))
++                .append(Component.text("TPS ", NamedTextColor.GRAY))
++                .append(Component.text(ONE_DEC.format(tps.median), CommandUtil.getColourForTPS(tps.median)))
++                .append(Component.text("  RAM ", NamedTextColor.GRAY))
++                .append(Component.text(usedMb + "MB", NamedTextColor.RED))
++                .append(Component.text("/" + maxMb + "MB (" + ramPercent + "%)", NamedTextColor.GRAY))
++                .build();
++        } else if (lowTps) {
++            warn = Component.text()
++                .append(Component.text("\u26a0 ", NamedTextColor.RED))
++                .append(Component.text("LOW TPS: ", NamedTextColor.RED))
++                .append(Component.text(ONE_DEC.format(tps.median), CommandUtil.getColourForTPS(tps.median)))
++                .append(Component.text(" (worst " + ONE_DEC.format(tps.min) + ")", NamedTextColor.GRAY))
++                .build();
++        } else {
++            warn = Component.text()
++                .append(Component.text("\u26a0 ", NamedTextColor.RED))
++                .append(Component.text("HIGH MEMORY: ", NamedTextColor.RED))
++                .append(Component.text(usedMb + "MB", NamedTextColor.RED))
++                .append(Component.text("/" + maxMb + "MB (" + ramPercent + "%)", NamedTextColor.GRAY))
++                .build();
++        }
++
++        for (final Player player : Bukkit.getOnlinePlayers()) {
++            if (player.isOp() || player.isPermissionSet("sea.monitor.warn")) {
++                player.sendActionBar(warn);
++            }
++        }
++        MinecraftServer.LOGGER.warn("[SeaMonitor] {} TPS={} (median={}) RAM={}MB/{}MB ({}%)",
++                lowTps ? "Low TPS" : "High memory", NO_DEC.format(tps.min), ONE_DEC.format(tps.median),
++                usedMb, maxMb, ramPercent);
++    }
++
++    // ---- bar builders ---------------------------------------------------------------------
++
++    private static Component buildTpsBar(final TpsSnapshot tps) {
++        return Component.text()
++            .append(Component.text("TPS ", NamedTextColor.DARK_GRAY))
++            .append(Component.text(TWO_DEC.format(tps.median), CommandUtil.getColourForTPS(tps.median)))
++            .append(Component.text("  MSPT ", NamedTextColor.DARK_GRAY))
++            .append(Component.text(TWO_DEC.format(tps.mspf), TextColor.color(255, 170, 0)))
++            .append(Component.text("  Worst ", NamedTextColor.DARK_GRAY))
++            .append(Component.text(TWO_DEC.format(tps.min), CommandUtil.getColourForTPS(tps.min)))
++            .build();
++    }
++
++    private static Component buildRamBar(final long usedMb, final long maxMb, final int ramPercent) {
++        final TextColor colour = colourForPercent(ramPercent);
++        return Component.text()
++            .append(Component.text("RAM ", NamedTextColor.DARK_GRAY))
++            .append(Component.text(usedMb + "MB", colour))
++            .append(Component.text(" / ", NamedTextColor.DARK_GRAY))
++            .append(Component.text(maxMb + "MB", NamedTextColor.AQUA))
++            .append(Component.text(" (", NamedTextColor.DARK_GRAY))
++            .append(Component.text(ramPercent + "%", colour))
++            .append(Component.text(")", NamedTextColor.DARK_GRAY))
++            .build();
++    }
++
++    private static TextColor colourForPercent(final int percent) {
++        if (percent >= 95) {
++            return NamedTextColor.DARK_RED;
++        }
++        if (percent >= 85) {
++            return NamedTextColor.RED;
++        }
++        if (percent >= 70) {
++            return NamedTextColor.GOLD;
++        }
++        if (percent >= 50) {
++            return NamedTextColor.YELLOW;
++        }
++        return NamedTextColor.GREEN;
++    }
++
++    // ---- server-wide stats ------------------------------------------------------------------
++
++    private record TpsSnapshot(double median, double min, double mspf) {
++    }
++
++    private static TpsSnapshot computeServerTps(final long now) {
++        final double[] min = {20.0};
++        final List<Double> byRegion = new ArrayList<>();
++
++        for (final World bukkitWorld : Bukkit.getWorlds()) {
++            final net.minecraft.server.level.ServerLevel world = ((CraftWorld) bukkitWorld).getHandle();
++            world.regioniser.computeForAllRegions(region -> {
++                final TickData.TickReportData report = region.getData().getRegionSchedulingHandle().getTickReport15s(now);
++                if (report != null) {
++                    final double tps = report.tpsData().segmentAll().average();
++                    min[0] = Math.min(min[0], tps);
++                    byRegion.add(tps);
++                }
++            });
++        }
++
++        if (!byRegion.isEmpty()) {
++            byRegion.sort(Double::compare);
++            final int middle = byRegion.size() >> 1;
++            final double median = (byRegion.size() & 1) == 0
++                ? (byRegion.get(middle - 1) + byRegion.get(middle)) / 2.0
++                : byRegion.get(middle);
++            return new TpsSnapshot(median, min[0], tpsToMspf(median));
++        }
++        return new TpsSnapshot(20.0, 20.0, 0.0);
++    }
++
++    private static double tpsToMspf(final double tps) {
++        if (tps <= 0.0) {
++            return Double.MAX_VALUE;
++        }
++        return 1000.0 / tps;
++    }
++}

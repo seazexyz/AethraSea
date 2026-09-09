@@ -1,0 +1,121 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: AethraSea <aethrasea@users.noreply.github.com>
+Date: Wed, 9 Sep 2026 12:00:00 +0700
+Subject: [PATCH] AethraSea: sea.yml config, packet flood limiter, packet event pipeline, performance monitor
+
+
+diff --git a/net/minecraft/network/Connection.java b/net/minecraft/network/Connection.java
+--- a/net/minecraft/network/Connection.java
++++ b/net/minecraft/network/Connection.java
+@@ -119,6 +119,9 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+         this.stopReadingPackets = true;
+     }
+     // Paper end - packet limiter
++    // Sea start - configurable packet flood limiter (sea.yml network.packet-flood-limiter)
++    protected io.papermc.paper.util.@Nullable IntervalledCounter seaPacketCounts;
++    // Sea end - configurable packet flood limiter
+     @Nullable public SocketAddress haProxyAddress; // Paper - Add API to get player's proxy address
+     public java.util.@Nullable Optional<net.minecraft.network.chat.Component> legacySavedLoginEventResultOverride; // Paper - playerloginevent
+     public boolean handledLegacyLoginEvent; // Paper - playerloginevent
+@@ -303,9 +306,34 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+                 }
+             }
+             // Paper end - packet limiter
+-            if (packetListener.shouldHandleMessage(packet)) {
++            // Sea start - wire sea.yml packet flood limiter + async packet event pipeline
++            if (dev.folia.sea.config.SeaConfig.packetFloodLimiter) {
++                final int maxPackets = dev.folia.sea.config.SeaConfig.maxPacketsPerSecond;
++                if (maxPackets > 0) {
++                    if (this.seaPacketCounts == null) {
++                        this.seaPacketCounts = new io.papermc.paper.util.IntervalledCounter(1_000_000_000L);
++                    }
++                    final long seaTime = System.nanoTime();
++                    synchronized (PACKET_LIMIT_LOCK) {
++                        this.seaPacketCounts.updateAndAdd(1, seaTime);
++                        if (this.seaPacketCounts.getRate() > maxPackets) {
++                            dev.folia.sea.network.SeaPacketEventPipeline.recordDroppedSpam();
++                            net.minecraft.server.MinecraftServer.LOGGER.warn("{} kicked by sea.yml packet flood limiter (limit {} pkt/s)",
++                                this.getLoggableAddress(net.minecraft.server.MinecraftServer.getServer().logIPs()), maxPackets);
++                            this.killForPacketSpam();
++                            return;
++                        }
++                    }
++                }
++            }
++            final net.minecraft.network.protocol.Packet<?> seaHandled = dev.folia.sea.network.SeaPacketEventPipeline.handleInbound(this, packet);
++            if (seaHandled == null) {
++                return;
++            }
++            // Sea end - wire sea.yml packet flood limiter + async packet event pipeline
++            if (packetListener.shouldHandleMessage(seaHandled)) {
+                 try {
+-                    genericsFtw(packet, packetListener);
++                    genericsFtw(seaHandled, packetListener);
+                 } catch (RunningOnDifferentThreadException var5) {
+                 } catch (io.papermc.paper.util.ServerStopRejectedExecutionException ignored) { // Paper - do not prematurely disconnect players on stop
+                 } catch (RejectedExecutionException ignored) {
+@@ -433,26 +461,32 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+     }
+ 
+     public void send(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush) {
++        // Sea start - async packet event pipeline (sea.yml network.async-packet-events)
++        final net.minecraft.network.protocol.Packet<?> seaOut = dev.folia.sea.network.SeaPacketEventPipeline.handleOutbound(this, packet);
++        if (seaOut == null) {
++            return; // cancelled by a registered outbound interceptor
++        }
++        // Sea end - async packet event pipeline
+         // Paper start - Optimize network: Handle oversized packets better
+         final boolean connected = this.isConnected();
+         if (!connected && !this.preparing) {
+             return;
+         }
+ 
+-        packet.onPacketDispatch(this.getPlayer());
+-        if (false && connected && (InnerUtil.canSendImmediate(this, packet) // Folia - region threading - connection fixes
+-            || (io.papermc.paper.util.MCUtil.isMainThread() && packet.isReady() && this.pendingActions.isEmpty()
+-            && (packet.getExtraPackets() == null || packet.getExtraPackets().isEmpty())))) {
+-            this.sendPacket(packet, listener, flush);
++        seaOut.onPacketDispatch(this.getPlayer());
++        if (false && connected && (InnerUtil.canSendImmediate(this, seaOut) // Folia - region threading - connection fixes
++            || (io.papermc.paper.util.MCUtil.isMainThread() && seaOut.isReady() && this.pendingActions.isEmpty()
++            && (seaOut.getExtraPackets() == null || seaOut.getExtraPackets().isEmpty())))) {
++            this.sendPacket(seaOut, listener, flush);
+         } else {
+             // Write the packets to the queue, then flush - antixray hooks there already
+-            final java.util.List<Packet<?>> extraPackets = InnerUtil.buildExtraPackets(packet);
++            final java.util.List<Packet<?>> extraPackets = InnerUtil.buildExtraPackets(seaOut);
+             final boolean hasExtraPackets = extraPackets != null && !extraPackets.isEmpty();
+             if (!hasExtraPackets) {
+-                this.pendingActions.add(new PacketSendAction(packet, listener, flush));
++                this.pendingActions.add(new PacketSendAction(seaOut, listener, flush));
+             } else {
+                 final java.util.List<PacketSendAction> actions = new java.util.ArrayList<>(1 + extraPackets.size());
+-                actions.add(new PacketSendAction(packet, null, false)); // Delay the future listener until the end of the extra packets
++                actions.add(new PacketSendAction(seaOut, null, false)); // Delay the future listener until the end of the extra packets
+ 
+                 for (int i = 0, len = extraPackets.size(); i < len;) {
+                     final Packet<?> extraPacket = extraPackets.get(i);
+diff --git a/net/minecraft/server/MinecraftServer.java b/net/minecraft/server/MinecraftServer.java
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -602,6 +602,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+         Runtime.getRuntime().addShutdownHook(new org.bukkit.craftbukkit.util.ServerShutdownThread(this));
+         // CraftBukkit end
+         this.paperConfigurations = services.paper().configurations(); // Paper - add paper configuration files
++        dev.folia.sea.config.SeaConfig.init(); // Sea - load AethraSea sea.yml configuration
+     }
+ 
+     protected abstract boolean initServer() throws IOException;
+diff --git a/io/papermc/paper/threadedregions/RegionizedServer.java b/io/papermc/paper/threadedregions/RegionizedServer.java
+--- a/io/papermc/paper/threadedregions/RegionizedServer.java
++++ b/io/papermc/paper/threadedregions/RegionizedServer.java
+@@ -240,6 +240,9 @@ public final class RegionizedServer {
+         // scheduler
+         ((FoliaGlobalRegionScheduler)Bukkit.getGlobalRegionScheduler()).tick();
+ 
++        // AethraSea - real-time performance HUD (1 Hz)
++        dev.folia.sea.monitor.SeaPerformanceMonitor.tick();
++
+         // clock tick
+         this.tickClocks();
+ 

@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Wed, 9 Sep 2026 10:53:59 +0700
+Subject: [PATCH] AethraSea: register /tpsbar /rambar /seagui monitoring
+ commands
+
+
+diff --git a/src/main/java/io/papermc/paper/command/PaperCommands.java b/src/main/java/io/papermc/paper/command/PaperCommands.java
+index 6216147f4d4c04ba616375430a91232d5ebe838a..008b1f8861178df31c5e81cc833604d4e8bf3693 100644
+--- a/src/main/java/io/papermc/paper/command/PaperCommands.java
++++ b/src/main/java/io/papermc/paper/command/PaperCommands.java
+@@ -25,6 +25,13 @@ public final class PaperCommands {
+         COMMANDS.put("paper", new PaperCommand("paper"));
+         COMMANDS.put("tps", new io.papermc.paper.threadedregions.commands.CommandServerHealth()); // Folia - region threading
+         COMMANDS.put("profiler", new io.papermc.paper.threadedregions.commands.CommandProfiler()); // Folia - region threading - profiler
++        // AethraSea start - monitoring + status commands
++        COMMANDS.put("tpsbar", new dev.folia.sea.commands.CommandTpsBar());
++        COMMANDS.put("rambar", new dev.folia.sea.commands.CommandRambar());
++        if (dev.folia.sea.config.SeaConfig.guiEnabled) {
++            COMMANDS.put("seagui", new dev.folia.sea.gui.CommandSeaGui());
++        }
++        // AethraSea end - monitoring + status commands
+ 
+         COMMANDS.forEach((s, command) -> {
+             server.server.getCommandMap().register(s, "Paper", command);

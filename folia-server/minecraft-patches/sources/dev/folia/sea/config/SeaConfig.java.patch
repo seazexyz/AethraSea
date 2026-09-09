@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/dev/folia/sea/config/SeaConfig.java
-@@ -1,0 +_,146 @@
+@@ -1,0 +_,177 @@
 +package dev.folia.sea.config;
 +
 +import com.mojang.logging.LogUtils;
@@ -9,7 +9,8 @@
 +
 +import java.io.File;
 +import java.io.IOException;
-+import java.util.List;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
 +
 +public final class SeaConfig {
 +
@@ -18,8 +19,8 @@
 +    private static YamlConfiguration config;
 +
 +    // Brand settings
-+    public static String f3BrandName = "uniquecraft";
-+    public static String serverName = "uniquecraft";
++    public static String f3BrandName = "AethraSea";
++    public static String serverName = "AethraSea";
 +
 +    // Performance settings
 +    public static boolean smartRegionMerging = true;
@@ -50,6 +51,11 @@
 +    // GUI settings
 +    public static boolean guiEnabled = true;
 +
++    // Performance monitor settings (drives /tpsbar, /rambar and automatic warnings)
++    public static boolean monitorWarnEnabled = true;
++    public static double monitorWarnTpsThreshold = 18.0;
++    public static int monitorWarnRamPercent = 85;
++
 +    private SeaConfig() {}
 +
 +    public static void init() {
@@ -60,43 +66,59 @@
 +    }
 +
 +    private static void createDefaultConfig() {
-+        config = new YamlConfiguration();
++        final String defaultConfig = """
++            # AethraSea Hybrid Engine configuration.
++            # Configure the engine's threading, networking, security and monitoring behaviour.
++            #
++            # Wired behaviour (these values actually change how the engine runs):
++            #   performance.async-chunk-io           - load/generate chunks on worker threads
++            #   performance.async-pathfinding        - run mob path-finding on dedicated threads
++            #   performance.pathfinding-threads      - number of path-finding worker threads
++            #   network.packet-flood-limiter         - drop + kick clients exceeding max-packets-per-second
++            #   network.max-packets-per-second       - packet flood threshold per connection
++            #   network.async-packet-events          - route packets through the async event pipeline
++            #   performance.monitor-warning.*        - auto action-bar warnings to ops on low TPS / high RAM
++            #   gui.enabled                          - enables /seagui and the in-game status GUI
 +
-+        // Brand
-+        config.set("brand.f3-brand-name", "uniquecraft");
-+        config.set("brand.server-name", "uniquecraft");
++            brand:
++              f3-brand-name: 'AethraSea'
++              server-name: 'AethraSea'
 +
-+        // Performance & Threading
-+        config.set("performance.smart-region-merging", true);
-+        config.set("performance.region-merge-hysteresis-ticks", 20);
-+        config.set("performance.async-chunk-io", true);
-+        config.set("performance.async-pathfinding", true);
-+        config.set("performance.pathfinding-threads", Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
++            performance:
++              smart-region-merging: true
++              region-merge-hysteresis-ticks: 20
++              async-chunk-io: true
++              async-pathfinding: true
++              pathfinding-threads: 4
++              monitor-warning:
++                enabled: true
++                tps-threshold: 18.0
++                ram-percent-threshold: 85
 +
-+        // Gameplay & Folia Mechanics
-+        config.set("gameplay.stasis-chamber-fix", true);
-+        config.set("gameplay.smooth-cross-region-fluids", true);
-+        config.set("gameplay.cross-region-vehicle-rubberband-fix", true);
-+        config.set("gameplay.cross-region-villager-poi-sync", true);
++            gameplay:
++              stasis-chamber-fix: true
++              smooth-cross-region-fluids: true
++              cross-region-vehicle-rubberband-fix: true
++              cross-region-villager-poi-sync: true
 +
-+        // Network & Security
-+        config.set("network.packet-flood-limiter", true);
-+        config.set("network.max-packets-per-second", 500);
-+        config.set("network.region-packet-rate-limit", true);
-+        config.set("network.async-packet-events", true);
++            network:
++              packet-flood-limiter: true
++              max-packets-per-second: 500
++              region-packet-rate-limit: true
++              async-packet-events: true
 +
-+        // Security & Stability
-+        config.set("security.graceful-region-recovery", true);
-+        config.set("security.book-sign-payload-validator", true);
-+        config.set("security.max-sign-text-length", 384);
-+        config.set("security.max-book-pages", 100);
-+        config.set("security.max-book-page-length", 1024);
++            security:
++              graceful-region-recovery: true
++              book-sign-payload-validator: true
++              max-sign-text-length: 384
++              max-book-pages: 100
++              max-book-page-length: 1024
 +
-+        // GUI
-+        config.set("gui.enabled", true);
-+
++            gui:
++              enabled: true
++            """;
 +        try {
-+            config.save(CONFIG_FILE);
++            Files.write(CONFIG_FILE.toPath(), defaultConfig.getBytes(StandardCharsets.UTF_8));
 +            LOGGER.info("[SeaConfig] Created default sea.yml configuration.");
 +        } catch (IOException e) {
 +            LOGGER.error("[SeaConfig] Could not save default sea.yml", e);
@@ -108,8 +130,8 @@
 +            config = YamlConfiguration.loadConfiguration(CONFIG_FILE);
 +
 +            // Brand
-+            f3BrandName = config.getString("brand.f3-brand-name", "uniquecraft");
-+            serverName = config.getString("brand.server-name", "uniquecraft");
++            f3BrandName = config.getString("brand.f3-brand-name", "AethraSea");
++            serverName = config.getString("brand.server-name", "AethraSea");
 +
 +            // Performance
 +            smartRegionMerging = config.getBoolean("performance.smart-region-merging", true);
@@ -117,6 +139,11 @@
 +            asyncChunkIo = config.getBoolean("performance.async-chunk-io", true);
 +            asyncPathfinding = config.getBoolean("performance.async-pathfinding", true);
 +            pathfindingThreads = config.getInt("performance.pathfinding-threads", Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
++
++            // Performance monitor
++            monitorWarnEnabled = config.getBoolean("performance.monitor-warning.enabled", true);
++            monitorWarnTpsThreshold = config.getDouble("performance.monitor-warning.tps-threshold", 18.0);
++            monitorWarnRamPercent = config.getInt("performance.monitor-warning.ram-percent-threshold", 85);
 +
 +            // Gameplay
 +            stasisChamberFix = config.getBoolean("gameplay.stasis-chamber-fix", true);
@@ -140,10 +167,14 @@
 +            // GUI
 +            guiEnabled = config.getBoolean("gui.enabled", true);
 +
-+            LOGGER.info("[SeaConfig] Successfully loaded sea.yml (Brand: {}, Async I/O: {}, Async Pathfinding: {}, Stasis Fix: {})",
-+                    f3BrandName, asyncChunkIo, asyncPathfinding, stasisChamberFix);
++            LOGGER.info("[SeaConfig] Loaded sea.yml | Brand: {}, Async I/O: {}, Async Pathfinding: {}, Packet Limiter: {}, Monitor Warnings: {}",
++                    f3BrandName, asyncChunkIo, asyncPathfinding, packetFloodLimiter, monitorWarnEnabled);
 +        } catch (Exception e) {
 +            LOGGER.error("[SeaConfig] Failed to load sea.yml, using default values", e);
 +        }
++    }
++
++    public static boolean isMonitorWarningEnabled() {
++        return monitorWarnEnabled;
 +    }
 +}
