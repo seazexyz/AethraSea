@@ -37,11 +37,11 @@ AethraSea เริ่มต้นจากโปรเจกต์ **ส่ว�
 
 จุดเด่นที่สุดของ AethraSea คือ **Hybrid Engine**:
 
-> เอา **region threading ของ Folia** (หลาย thread รันโลกแบบขนาน → TPS สวยมาก)
+> เอา **region threading ของ Folia**
 > มาผสมกับความสามารถในการโหลด **ปลั๊กอินแบบเดิม** (Bukkit / Spigot / Paper API)
 > ที่ปกติจะรันบน Folia ตรง ๆ ไม่ได้ — เราปรับให้มันรันได้จริง
 
-ผลลัพธ์คือ **ได้ทั้งความเร็ว แถมปลั๊กอินเก่ายังใช้ต่อ** ไม่ต้องเขียนปลั๊กอินใหม่จากศูนย์
+ผลลัพธ์คือ **ได้ทั้งความเร็ว แถมปลั๊กอินเก่ายังใช้ต่อ [บางตัว]** ไม่ต้องเขียนปลั๊กอินใหม่จากศูนย์
 
 ---
 
@@ -52,15 +52,15 @@ AethraSea เริ่มต้นจากโปรเจกต์ **ส่ว�
 | 🧬 **Hybrid Engine** | รันปลั๊กอิน Bukkit/Spigot/Paper บน Folia ได้จริงทำให้ปลักอินใช้งานได้ คำเตือน:ระบบที่ควบคุมหรือยุ่งกับระบบโลกอาจมีปัญหาได้ |
 | 🌊 **sea.yml** | คอนฟิกทุกอย่างรวมอยู่ในไฟล์เดียว มี **comment อธิบาย** กำกับทุกค่า เกิดอัตโนมัติตอนเปิดครั้งแรก ไม่ต้องมานั่งงม |
 | 📊 **Boss Bar HUD** | `/tpsbar` และ `/rambar` แสดง TPS / MSPT / RAM เป็น **boss bar** อัปเดตทุก 1 วินาที เปิดปิดได้เป็นรายคน |
-| 🖥️ **/seagui** | Dashboard แสดงสถานะเครื่องในเกม (VR แบบกล่อง) — ดู async chunk I/O, pathfinding, network, memory และอื่น ๆ พร้อมปุ่มรีเฟรช |
+| 🖥️ **/seagui** | Dashboard แสดงสถานะเครื่องในเกม — ดู async chunk I/O, pathfinding, network, memory และอื่น ๆ พร้อมปุ่มรีเฟรช |
 | 🛡️ **Packet Flood Limiter** | กันผู้เล่นที่ส่งแพ็กเก็ตเกินกำหนด (packets/second) อัตโนมัติ — ลดการ crash จาก bot / lag machine |
 | ⚡ **Async Chunk I/O** | โหลด/บันทึก chunk แบบ async หลังบ้าน ไม่เบียด main tick |
 | 🧠 **Async Pathfinding** | โยนงานหาเส้นทาง (A*) ของม็อบไปให้ worker pool แยก ตั้งจำนวน thread ได้ |
 | 🔀 **Smart Region Merging** | ปรับ hysteresis ของ Folia region merge เพื่อลด context switch บน chunk border |
 | 🔔 **Monitor Warning** | ถ้า TPS ต่ำ หรือ RAM ใกล้เต็ม จะแจ้งเตือน op + ลง log |
 
-> ⚠️ ใน `sea.yml` ยังมี option อีกกลุ่มที่ **แสดงสถานะได้ แต่ยังไม่ได้เปิดใช้งานจริง** (เช่น
-> stasis chamber fix, cross-region fluid, anti-rubberband, book/sign sanitizer) — เพราะมันเกี่ยวกับ
+> ⚠️ ใน `sea.yml` ยังมี option อีกกลุ่มที่ **แสดงสถานะได้ แต่ยังไม่ได้เปิดใช้งานจริง** เช่น
+> stasis chamber fix, cross-region fluid, anti-rubberband, book/sign sanitizer — เพราะมันเกี่ยวกับ
 > gameplay/packet โดยตรง ต้องค่อย ๆ คัดกรองกับเซิร์ฟเวอร์จริงก่อน กันพัง ผมใส่ไว้ให้ดูสถานะ
 > ใน GUI และเปิดปิดได้ในคอนฟิก แต่ขอ flag ว่า **ยังไม่ยืนยันเสถียร 100%**
 
@@ -72,7 +72,7 @@ AethraSea เริ่มต้นจากโปรเจกต์ **ส่ว�
 | --- | --- |
 | `/tpsbar [on\|off]` | เปิด/ปิด boss bar โชว์ TPS, MSPT และ worst region ต่อเนื่อง |
 | `/rambar [on\|off]` | เปิด/ปิด boss bar โชว์การใช้ RAM แบบเรียลไทม์ |
-| `/seagui` | เปิด dashboard สถานะระบบในเกม (กดปุ่ม Refresh เพื่อดูค่าล่าสุด) |
+| `/seagui` | เปิด dashboard สถานะระบบในเกม |
 | `/seagui reload` | รีโหลด `sea.yml` โดยไม่ต้อง restart |
 
 ---
@@ -148,7 +148,7 @@ java -Xms2G -Xmx4G -jar server.jar --nogui
 
 ## 🛠️ Build จาก Source
 
-เตรียม: **JDK 21+** (build ทดสอบด้วย JDK 26), **Git**
+เตรียม: **JDK 21+** ส่วนผม build ด้วย JDK 26, **Git**
 
 ```powershell
 git clone <repository-url> AethraSea
@@ -177,9 +177,9 @@ Remove-Item folia-server\build\libs\*.jar
 
 | ที่ | คืออะไร |
 | --- | --- |
-| `folia-server/minecraft-patches/features/` | แพตช์ระดับ Minecraft (network, config, threading) |
+| `folia-server/minecraft-patches/features/` | แพตช์ระดับ Minecraft network, config, threading |
 | `folia-server/minecraft-patches/sources/` | โค้ดใหม่ทั้งหมดของ `dev.folia.sea.*` |
-| `folia-server/paper-patches/features/` | แพตช์ระดับ Paper (คำสั่ง, GUI registry) |
+| `folia-server/paper-patches/features/` | แพตช์ระดับ Paper |
 
 โค้ดทั้งหมดของ AethraSea อยู่ในแพตช์ ซึ่งถูกคัดลอกเข้า source เวลารัน
 `applyAllPatches` — โค้ดใหม่ ๆ เขียนเป็นแพตช์เสมอ เพื่อให้ rebase กับ Folia ต้นทางง่าย
