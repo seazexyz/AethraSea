@@ -8,7 +8,7 @@
 
 ---
 
-`Minecraft 1.21` · `Java 21+` · `Folia-based` · `Hybrid Engine`
+`Minecraft 26.2` · `Java 21+` · `Folia-based` · `Hybrid Engine`
 
 </div>
 
@@ -49,15 +49,15 @@ AethraSea เริ่มต้นจากโปรเจกต์ **ส่ว�
 
 | ฟีเจอร์ | รายละเอียด |
 | --- | --- |
-| 🧬 **Hybrid Engine** | รันปลั๊กอิน Bukkit/Spigot/Paper บน Folia ได้จริง: แก้ deadlock ของ plugin gate, auto-relocate, inline scheduler, รองรับคำสั่ง/event/timeout ที่เคยพังตอน boot |
+| 🧬 **Hybrid Engine** | รันปลั๊กอิน Bukkit/Spigot/Paper บน Folia ได้จริงทำให้ปลักอินใช้งานได้ คำเตือน:ระบบที่ควบคุมหรือยุ่งกับระบบโลกอาจมีปัญหาได้ |
 | 🌊 **sea.yml** | คอนฟิกทุกอย่างรวมอยู่ในไฟล์เดียว มี **comment อธิบาย** กำกับทุกค่า เกิดอัตโนมัติตอนเปิดครั้งแรก ไม่ต้องมานั่งงม |
-| 📊 **Boss Bar HUD** | `/tpsbar` และ `/rambar` แสดง TPS / MSPT / RAM เป็น **boss bar** สวย ๆ อัปเดตทุก 1 วินาที เปิดปิดได้เป็นรายคน |
-| 🖥️ **/seagui** | Dashboard แสดงสถานะเครื่องในเกม (VR แบบกล่อง) — ดู async chunk I/O, pathfinding, network, memory และอื่น ๆ พร้อมปุ่มรีเฟรช **ย้ายของออกจาก GUI ไม่ได้** (กันของหาย/กันหลุดไปยังไอเทมของผู้เล่น) |
+| 📊 **Boss Bar HUD** | `/tpsbar` และ `/rambar` แสดง TPS / MSPT / RAM เป็น **boss bar** อัปเดตทุก 1 วินาที เปิดปิดได้เป็นรายคน |
+| 🖥️ **/seagui** | Dashboard แสดงสถานะเครื่องในเกม (VR แบบกล่อง) — ดู async chunk I/O, pathfinding, network, memory และอื่น ๆ พร้อมปุ่มรีเฟรช |
 | 🛡️ **Packet Flood Limiter** | กันผู้เล่นที่ส่งแพ็กเก็ตเกินกำหนด (packets/second) อัตโนมัติ — ลดการ crash จาก bot / lag machine |
 | ⚡ **Async Chunk I/O** | โหลด/บันทึก chunk แบบ async หลังบ้าน ไม่เบียด main tick |
 | 🧠 **Async Pathfinding** | โยนงานหาเส้นทาง (A*) ของม็อบไปให้ worker pool แยก ตั้งจำนวน thread ได้ |
 | 🔀 **Smart Region Merging** | ปรับ hysteresis ของ Folia region merge เพื่อลด context switch บน chunk border |
-| 🔔 **Monitor Warning** | ถ้า TPS ต่ำ หรือ RAM ใกล้เต็ม จะแจ้งเตือน op + ลง log (กำหนดเกณฑ์ได้) |
+| 🔔 **Monitor Warning** | ถ้า TPS ต่ำ หรือ RAM ใกล้เต็ม จะแจ้งเตือน op + ลง log |
 
 > ⚠️ ใน `sea.yml` ยังมี option อีกกลุ่มที่ **แสดงสถานะได้ แต่ยังไม่ได้เปิดใช้งานจริง** (เช่น
 > stasis chamber fix, cross-region fluid, anti-rubberband, book/sign sanitizer) — เพราะมันเกี่ยวกับ
@@ -120,14 +120,14 @@ monitor:
 > ก่อนปล่อย build
 
 ผมไม่ได้เอาโค้ด AI มาใส่โดยไม่ดู ถ้าเจอจุดบกพร่องจากโค้ดที่ AI เขียน ผมแก้และบันทึกไว้
-**เอาโค้ดนี้ไปใช้ได้ แต่ถ้าจะเอาไปประยุกต์/ต่อยอด แนะนำให้อ่านผ่านก่อนนะครับ** 🙂
+**เอาโค้ดนี้ไปใช้ได้ แต่ถ้าจะเอาไปต่อยอด แนะนำให้อ่านผ่านก่อนนะครับ** 🙂
 
 ---
 
 ## 📦 วิธีติดตั้ง
 
 1. **สำรองไฟล์** ที่สำคัญของเซิร์ฟเวอร์เดิมก่อน (world, plugins, config) ⚠️
-2. ดาวน์โหลด build ล่าสุดจาก **Releases** (ไฟล์ `folia-paperclip-26.2-SNAPSHOT.jar`) แล้วเปลี่ยนชื่อเป็น `server.jar`
+2. ดาวน์โหลด build ล่าสุดจาก **Releases** (ไฟล์ `AethraSea-26.2-SNAPSHOT.jar`) แล้วเปลี่ยนชื่อเป็น `server.jar`
 3. วางในโฟลเดอร์เซิร์ฟเวอร์ แล้วเริ่มเครื่อง:
 
 ```bash
@@ -208,6 +208,6 @@ Paper/Folia ตามที่ระบุในต้นทาง โปรด�
 
 <div align="center">
 
-Made with 💙 and a lot of ☕ · *"obtmize แบบชิบหายทุกวินาที"*
+Made with ❤️
 
 </div>
