@@ -23,7 +23,7 @@
 +public final class CommandSeaGui extends Command {
 +
 +    public CommandSeaGui() {
-+        super("seagui", "Opens the UniqueCraft & Folia status GUI dashboard", "/folia gui or /sea gui", Arrays.asList("foliagui", "seastatus"));
++        super("seagui", "Opens the AethraSea & Folia status GUI dashboard", "/sea gui", Arrays.asList("foliagui", "seastatus"));
 +        this.setPermission("folia.command.gui");
 +    }
 +
@@ -46,7 +46,7 @@
 +        }
 +
 +        // Console fallback text output
-+        sender.sendMessage(ChatColor.DARK_AQUA + "=== UniqueCraft / Folia Status Dashboard ===");
++        sender.sendMessage(ChatColor.DARK_AQUA + "=== AethraSea / Folia Status Dashboard ===");
 +        sender.sendMessage(ChatColor.GRAY + "• Brand: " + ChatColor.GOLD + SeaConfig.f3BrandName);
 +        sender.sendMessage(ChatColor.GRAY + "• Online: " + ChatColor.GREEN + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers());
 +        sender.sendMessage(ChatColor.GRAY + "• Async Chunk I/O: " + (SeaConfig.asyncChunkIo ? ChatColor.GREEN + "ENABLED (" + SeaChunkIOPool.getTotalTasksProcessed() + " tasks)" : ChatColor.RED + "DISABLED"));

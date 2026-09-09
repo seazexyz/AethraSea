@@ -1,0 +1,93 @@
+--- /dev/null
++++ b/dev/folia/sea/gui/SeaGuiClickListener.java
+@@ -1,0 +_,90 @@
++package dev.folia.sea.gui;
++
++import org.bukkit.entity.Player;
++import org.bukkit.event.Event;
++import org.bukkit.event.EventPriority;
++import org.bukkit.event.HandlerList;
++import org.bukkit.event.Listener;
++import org.bukkit.event.inventory.InventoryClickEvent;
++import org.bukkit.event.inventory.InventoryDragEvent;
++import org.bukkit.inventory.InventoryHolder;
++import org.bukkit.plugin.RegisteredListener;
++
++/**
++ * Protects the {@code /seagui} dashboard against item theft.
++ *
++ * <p>The dashboard is display-only: every click on it is cancelled so players cannot pull the
++ * status items (nether star, glass panes, ...) into their own inventory. The single exception is
++ * the refresh button in slot {@value #REFRESH_SLOT}, which re-opens the GUI to repaint metrics.</p>
++ *
++ * <p>The listener is registered without a plugin jar: {@link SeaGuiClickListener#ensureRegistered()}
++ * hands {@link SeaEmbeddedPlugin} to {@link HandlerList} directly, so no enabled plugin is needed.</p>
++ */
++public final class SeaGuiClickListener implements Listener {
++
++    public static final int REFRESH_SLOT = 49;
++
++    private static boolean registered;
++
++    private SeaGuiClickListener() {
++    }
++
++    public static synchronized void ensureRegistered() {
++        if (registered) {
++            return;
++        }
++        registered = true;
++
++        final SeaGuiClickListener listener = new SeaGuiClickListener();
++        InventoryClickEvent.getHandlerList().register(
++            new RegisteredListener(listener, listener::onClick, EventPriority.HIGHEST, SeaEmbeddedPlugin.INSTANCE, false));
++        InventoryDragEvent.getHandlerList().register(
++            new RegisteredListener(listener, listener::onDrag, EventPriority.HIGHEST, SeaEmbeddedPlugin.INSTANCE, false));
++    }
++
++    // -- dispatch (method-reference shape of org.bukkit.plugin.EventExecutor) -------------------
++
++    void onClick(final Listener listener, final Event event) {
++        if (!(event instanceof InventoryClickEvent click)) {
++            return;
++        }
++        try {
++            handleClick(click);
++        } catch (final Throwable t) {
++            // A guard failure must never break gameplay or packet processing.
++            click.setCancelled(true);
++        }
++    }
++
++    void onDrag(final Listener listener, final Event event) {
++        if (!(event instanceof InventoryDragEvent drag)) {
++            return;
++        }
++        try {
++            if (isSeaGui(drag.getView().getTopInventory().getHolder())) {
++                drag.setCancelled(true);
++            }
++        } catch (final Throwable ignored) {
++            drag.setCancelled(true);
++        }
++    }
++
++    // -- actual guard logic ----------------------------------------------------------------------
++
++    private static void handleClick(final InventoryClickEvent event) {
++        final InventoryHolder holder = event.getView().getTopInventory().getHolder();
++        if (!isSeaGui(holder)) {
++            return;
++        }
++
++        event.setCancelled(true);
++
++        if (event.getRawSlot() == REFRESH_SLOT && event.getWhoClicked() instanceof Player player) {
++            SeaStatusGUI.open(player);
++        }
++    }
++
++    private static boolean isSeaGui(final InventoryHolder holder) {
++        return holder == SeaGuiHolder.INSTANCE;
++    }
++}

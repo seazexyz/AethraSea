@@ -16,7 +16,7 @@
 +public final class CommandRambar extends Command {
 +
 +    public CommandRambar() {
-+        super("rambar", "Toggles the real-time RAM usage action bar", "/rambar [on|off]", Arrays.asList("memorybar", "ram-meter"));
++        super("rambar", "Toggles the real-time RAM usage boss bar", "/rambar [on|off]", Arrays.asList("memorybar", "ram-meter"));
 +        this.setPermission(null);
 +    }
 +

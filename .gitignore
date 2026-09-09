@@ -17,3 +17,6 @@ build
 /folia-checkstyle/build.gradle.kts
 
 .idea/
+
+# Standalone build artifacts copied to the repo root
+/*.jar

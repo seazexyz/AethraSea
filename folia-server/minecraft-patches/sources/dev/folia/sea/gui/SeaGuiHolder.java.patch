@@ -1,0 +1,24 @@
+--- /dev/null
++++ b/dev/folia/sea/gui/SeaGuiHolder.java
+@@ -1,0 +_,21 @@
++package dev.folia.sea.gui;
++
++import org.bukkit.inventory.Inventory;
++import org.bukkit.inventory.InventoryHolder;
++
++/**
++ * Singleton {@link InventoryHolder} used as the owner of every AethraSea status GUI. Gives the
++ * click guard a cheap, reliable way to recognise the GUI (holder identity) without parsing titles.
++ */
++public final class SeaGuiHolder implements InventoryHolder {
++
++    public static final SeaGuiHolder INSTANCE = new SeaGuiHolder();
++
++    private SeaGuiHolder() {
++    }
++
++    @Override
++    public Inventory getInventory() {
++        return null;
++    }
++}

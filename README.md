@@ -1,237 +1,213 @@
-[![Version](https://img.shields.io/maven-metadata/v?metadataUrl=https%3A%2F%2Fartifactory.papermc.io%2Fartifactory%2Funiverse%2Fdev%2Ffolia%2Ffolia-api%2Fmaven-metadata.xml&strategy=highestVersion&filter=26.1*&label=version&color=%23344ceb
-)](https://papermc.io/downloads/folia)
-[![Folia Build Status](https://img.shields.io/github/actions/workflow/status/PaperMC/Folia/build.yml?branch=ver/26.1.x)](https://github.com/PaperMC/Folia/actions)
-[![Discord](https://img.shields.io/discord/289587909051416579.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/papermc)
-===========
+<div align="center">
 
-<div align=center>
-    <img src="./folia.png">
-    <br /><br />
-    <p>Fork of <a href="https://github.com/PaperMC/Paper">Paper</a> which adds regionised multithreading to the dedicated server.</p>
+# 🌊 AethraSea
+
+### A Folia-based server core for people who want **both** — old plugins and modern performance
+
+**โปรเจกต์ส่วนตัวที่เปิดให้ทุกคนได้ลองใช้ · ฟรี 100% · fork โดยตรงจาก Folia 26.2**
+
+---
+
+`Minecraft 1.21` · `Java 21+` · `Folia-based` · `Hybrid Engine`
+
 </div>
 
-## Overview
+---
 
-Folia groups nearby loaded chunks to form an "independent region."
-See [the PaperMC documentation](https://docs.papermc.io/folia/reference/region-logic) for exact details on how Folia
-will group nearby chunks.
-Each independent region has its own tick loop, which is ticked at the
-regular Minecraft tickrate (20TPS). The tick loops are executed
-on a thread pool in parallel. There is no main thread anymore, 
-as each region effectively has its own "main thread" that executes
-the entire tick loop.
+## 📖 สารบัญ
 
-For a server with many spread out players, Folia will create many
-spread out regions and tick them all in parallel on a configurable sized
-threadpool. Thus, Folia should scale well for servers like this.
+- [ทำไมต้อง AethraSea?](#ทำไมต้อง-aethrasea)
+- [✨ ความสามารถหลัก](#-ความสามารถหลัก)
+- [🎮 คำสั่งในเกม](#-คำสั่งในเกม)
+- [🗺️ sea.yml คืออะไร](#️-sea.yml-คืออะไร)
+- [🤖 เรื่อง AI ตรงไปตรงมา](#-เรื่อง-ai-ตรงไปตรงมา)
+- [📦 วิธีติดตั้ง](#-วิธีติดตั้ง)
+- [🛠️ Build จาก Source](#️-build-จาก-source)
+- [📂 โครงสร้างแพตช์](#-โครงสร้างแพตช์)
+- [💬 ข้อควรรู้ก่อนอัปเกรด](#-ข้อควรรู้ก่อนอัปเกรด)
+- [⚖️ License](#️-license)
 
-Folia is also its own project, this will not be merged into Paper
-for the foreseeable future. 
+---
 
-A more detailed but abstract overview: [Project overview](https://docs.papermc.io/folia/reference/overview).
+## ทำไมต้อง AethraSea?
 
-## FAQ
+AethraSea เริ่มต้นจากโปรเจกต์ **ส่วนตัว** — ผมต้องการ core ที่แรงพอจะรันเซิร์ฟเวอร์ของตัวเอง
+ได้แบบเนียน ๆ โดยไม่ต้องทิ้งปลั๊กอินตัวเก่าที่ใช้มานาน แต่พอทำไปทำมา มันก็กลายเป็นอะไรที่
+อยากแชร์ให้คนอื่นได้ลองใช้ด้วย 😄
 
-### What server types can benefit from Folia?
-Server types that naturally spread players out, 
-like skyblock or SMP, will benefit the most from Folia. The server
-should have a sizeable player count, too.
+จุดเด่นที่สุดของ AethraSea คือ **Hybrid Engine**:
 
-### What hardware will Folia run best on?
-Ideally, at least 16 _cores_ (not threads).
+> เอา **region threading ของ Folia** (หลาย thread รันโลกแบบขนาน → TPS สวยมาก)
+> มาผสมกับความสามารถในการโหลด **ปลั๊กอินแบบเดิม** (Bukkit / Spigot / Paper API)
+> ที่ปกติจะรันบน Folia ตรง ๆ ไม่ได้ — เราปรับให้มันรันได้จริง
 
-### How to best configure Folia?
-First, it is recommended that the world is pre-generated so that the number
-of chunk system worker threads required is reduced greatly.
+ผลลัพธ์คือ **ได้ทั้งความเร็ว แถมปลั๊กอินเก่ายังใช้ต่อ** ไม่ต้องเขียนปลั๊กอินใหม่จากศูนย์
 
-The following is a _very rough_ estimation based off of the testing
-done before Folia was released on the test server we ran that
-had ~330 players peak. So, it is not exact and will require further tuning - 
-just take it as a starting point.
+---
 
-The total number of cores on the machine available should be 
-taken into account. Then, allocate threads for: 
-- netty IO :~4 per 200-300 players
-- chunk system io threads: ~3 per 200-300 players
-- chunk system workers if pre-generated, ~2 per 200-300 players
-- There is no best guess for chunk system workers if not pre-generated, as
-  on the test server we ran we gave 16 threads but chunk generation was still
-  slow at ~300 players.
-- GC Settings: ???? But, GC settings _do_ allocate concurrent threads, and you need
-  to know exactly how many. This is typically through the `-XX:ConcGCThreads=n` flag. Do not
-  confuse this flag with `-XX:ParallelGCThreads=n`, as parallel GC threads only run when
-  the application is paused by GC and as such should not be taken into account.
+## ✨ ความสามารถหลัก
 
-After all of that allocation, the remaining cores on the system until 80%
-allocation (total threads allocated < 80% of cpus available) can be
-allocated to tickthreads (under global config, threaded-regions.threads). 
+| ฟีเจอร์ | รายละเอียด |
+| --- | --- |
+| 🧬 **Hybrid Engine** | รันปลั๊กอิน Bukkit/Spigot/Paper บน Folia ได้จริง: แก้ deadlock ของ plugin gate, auto-relocate, inline scheduler, รองรับคำสั่ง/event/timeout ที่เคยพังตอน boot |
+| 🌊 **sea.yml** | คอนฟิกทุกอย่างรวมอยู่ในไฟล์เดียว มี **comment อธิบาย** กำกับทุกค่า เกิดอัตโนมัติตอนเปิดครั้งแรก ไม่ต้องมานั่งงม |
+| 📊 **Boss Bar HUD** | `/tpsbar` และ `/rambar` แสดง TPS / MSPT / RAM เป็น **boss bar** สวย ๆ อัปเดตทุก 1 วินาที เปิดปิดได้เป็นรายคน |
+| 🖥️ **/seagui** | Dashboard แสดงสถานะเครื่องในเกม (VR แบบกล่อง) — ดู async chunk I/O, pathfinding, network, memory และอื่น ๆ พร้อมปุ่มรีเฟรช **ย้ายของออกจาก GUI ไม่ได้** (กันของหาย/กันหลุดไปยังไอเทมของผู้เล่น) |
+| 🛡️ **Packet Flood Limiter** | กันผู้เล่นที่ส่งแพ็กเก็ตเกินกำหนด (packets/second) อัตโนมัติ — ลดการ crash จาก bot / lag machine |
+| ⚡ **Async Chunk I/O** | โหลด/บันทึก chunk แบบ async หลังบ้าน ไม่เบียด main tick |
+| 🧠 **Async Pathfinding** | โยนงานหาเส้นทาง (A*) ของม็อบไปให้ worker pool แยก ตั้งจำนวน thread ได้ |
+| 🔀 **Smart Region Merging** | ปรับ hysteresis ของ Folia region merge เพื่อลด context switch บน chunk border |
+| 🔔 **Monitor Warning** | ถ้า TPS ต่ำ หรือ RAM ใกล้เต็ม จะแจ้งเตือน op + ลง log (กำหนดเกณฑ์ได้) |
 
-The reason you should not allocate more than 80% of the cores is due to the
-fact that plugins or even the server may make use of additional threads 
-that you cannot configure or even predict.
+> ⚠️ ใน `sea.yml` ยังมี option อีกกลุ่มที่ **แสดงสถานะได้ แต่ยังไม่ได้เปิดใช้งานจริง** (เช่น
+> stasis chamber fix, cross-region fluid, anti-rubberband, book/sign sanitizer) — เพราะมันเกี่ยวกับ
+> gameplay/packet โดยตรง ต้องค่อย ๆ คัดกรองกับเซิร์ฟเวอร์จริงก่อน กันพัง ผมใส่ไว้ให้ดูสถานะ
+> ใน GUI และเปิดปิดได้ในคอนฟิก แต่ขอ flag ว่า **ยังไม่ยืนยันเสถียร 100%**
 
-Additionally, the above is all a rough guess based on player count, but
-it is very likely that the thread allocation will not be ideal, and you 
-will need to tune it based on usage of the threads that you end up seeing.
+---
 
-## Plugin compatibility
+## 🎮 คำสั่งในเกม
 
-There is no more main thread. I expect _every_ single plugin
-that exists to require _some_ level of modification to function
-in Folia. Additionally, multithreading of _any kind_ introduces
-possible race conditions in plugin held data - so, there are bound
-to be changes that need to be made.
+| คำสั่ง | ความหมาย |
+| --- | --- |
+| `/tpsbar [on\|off]` | เปิด/ปิด boss bar โชว์ TPS, MSPT และ worst region ต่อเนื่อง |
+| `/rambar [on\|off]` | เปิด/ปิด boss bar โชว์การใช้ RAM แบบเรียลไทม์ |
+| `/seagui` | เปิด dashboard สถานะระบบในเกม (กดปุ่ม Refresh เพื่อดูค่าล่าสุด) |
+| `/seagui reload` | รีโหลด `sea.yml` โดยไม่ต้อง restart |
 
-So, have your expectations for compatibility at 0.
+---
 
-## API plans
+## 🗺️ sea.yml คืออะไร
 
-Currently, there is a lot of API that relies on the main thread. 
-I expect basically zero plugins that are compatible with Paper to 
-be compatible with Folia. However, there are plans to add API that 
-would allow Folia plugins to be compatible with Paper.
+ไฟล์คอนฟิกกลางของ AethraSea — สร้างอัตโนมัติที่โฟลเดอร์เซิร์ฟเวอร์ตอนเปิดครั้งแรก
+พร้อม comment อธิบายทุกค่า:
 
-For example, the Bukkit Scheduler. The Bukkit Scheduler inherently
-relies on a single main thread. Folia's RegionScheduler and Folia's
-EntityScheduler allow scheduling of tasks to the "next tick" of whatever
-region "owns" either a location or an entity. These could be implemented
-on regular Paper, except they schedule to the main thread - in both cases,
-the execution of the task will occur on the thread that "owns" the
-location or entity. This concept applies in general, as the current Paper
-(single threaded) can be viewed as one giant "region" that encompasses
-all chunks in all worlds. 
+```yaml
+brand:
+  f3-brand-name: 'AethraSea'     # ชื่อที่แสดงบน F3
+  server-name: 'AethraSea'       # ชื่อเซิร์ฟเวอร์
 
-It is not yet decided whether to add this API to Paper itself directly
-or to Paperlib.
+performance:
+  async-chunk-io: true           # Async chunk load/save
+  async-pathfinding: true        # Mob pathfinding offload
+  pathfinding-threads: 2         # จำนวน thread สำหรับ pathfinding
+  smart-region-merging: true     # ปรับ region merge hysteresis
+  region-merge-hysteresis-ticks: 2
 
-### The new rules
+network:
+  packet-flood-limiter: true     # กัน packet spam
+  max-packets-per-second: 240    # ขีดจำกัดก่อนโดนเตะ
+  async-packet-events: true      # ขัด pipeline แพ็กเก็ตแบบ async
 
-First, Folia breaks many plugins. To aid users in figuring out which
-plugins work, only plugins that have been explicitly marked by the
-author(s) to work with Folia will be loaded. By placing
-"folia-supported: true" into the plugin's plugin.yml, plugin authors
-can mark their plugin as compatible with regionised multithreading.
+gui:
+  enabled: true                  # เปิด /seagui
 
-The other important rule is that the regions tick in _parallel_, and not 
-_concurrently_. They do not share data, they do not expect to share data,
-and sharing of data _will_ cause data corruption. 
-Code that is running in one region under no circumstance can 
-be accessing or modifying data that is in another region. Just 
-because multithreading is in the name, it doesn't mean that everything 
-is now thread-safe. In fact, there are only a _few_ things that were 
-made thread-safe to make this happen. As time goes on, the number 
-of thread context checks will only grow, even _if_ it comes at a 
-performance penalty - _nobody_ is going to use or develop for a 
-server platform that is buggy as hell, and the only way to 
-prevent and find these bugs is to make bad accesses fail _hard_ at the 
-source of the bad access.
-
-This means that Folia compatible plugins need to take advantage of 
-API like the RegionScheduler and the EntityScheduler to ensure 
-their code is running on the correct thread context.
-
-In general, it is safe to assume that a region owns chunk data
-in an approximate 8 chunks from the source of an event (i.e. player
-breaks block, can probably access 8 chunks around that block). But,
-this is not guaranteed - plugins should take advantage of upcoming
-thread-check API to ensure correct behavior.
-
-The only guarantee of thread-safety comes from the fact that a
-single region owns data in certain chunks - and if that region is
-ticking, then it has full access to that data. This data is 
-specifically entity/chunk/poi data, and is entirely unrelated
-to **ANY** plugin data.
-
-Normal multithreading rules apply to data that plugins store/access
-their own data or another plugin's - events/commands/etc. are called 
-in _parallel_ because regions are ticking in _parallel_ (we CANNOT 
-call them in a synchronous fashion, as this opens up deadlock issues 
-and would handicap performance). There are no easy ways out of this, 
-it depends solely on what data is being accessed. Sometimes a 
-concurrent collection (like ConcurrentHashMap) is enough, and often a 
-concurrent collection used carelessly will only _hide_ threading 
-issues, which then become near impossible to debug.
-
-### Current API additions
-
-To properly understand API additions, please read
-[Project overview](https://docs.papermc.io/folia/reference/overview).
-
-- RegionScheduler, AsyncScheduler, GlobalRegionScheduler, and EntityScheduler 
-  acting as a replacement for  the BukkitScheduler.
-  The entity scheduler is retrieved via Entity#getScheduler, and the
-  rest of the schedulers can be retrieved from the Bukkit/Server classes.
-- Bukkit#isOwnedByCurrentRegion to test if the current ticking region
-  owns positions/entities
-
-### Thread contexts for API
-
-To properly understand API additions, please read
-[Project overview](https://docs.papermc.io/folia/reference/overview).
-
-General rules of thumb:
-
-1. Commands for entities/players are called on the region which owns
-the entity/player. Console commands are executed on the global region.
-
-2. Events involving a single entity (i.e player breaks/places block) are
-called on the region owning entity. Events involving actions on an entity
-(such as entity damage) are invoked on the region owning the target entity.
-
-3. The async modifier for events is deprecated - all events
-fired from regions or the global region are considered _synchronous_, 
-even though there is no main thread anymore. 
-
-### Current broken API
-
-- Most API that interacts with portals / respawning players / some
-  player login API is broken.
-- ALL scoreboard API is considered broken (this is global state that
-  I've not figured out how to properly implement yet)
-- World loading/unloading
-- Entity#teleport. This will NEVER UNDER ANY CIRCUMSTANCE come back, 
-  use teleportAsync
-- Could be more
-
-### Planned API additions
-
-- Proper asynchronous events. This would allow the result of an event
-  to be completed later, on a different thread context. This is required
-  to implement some things like spawn position select, as asynchronous
-  chunk loads are required when accessing chunk data out-of-region.
-- World loading/unloading
-- More to come here
-
-### Planned API changes
-
-- Super aggressive thread checks across the board. This is absolutely
-  required to prevent plugin devs from shipping code that may randomly
-  break random parts of the server in entirely _undiagnosable_ manners.
-- More to come here
-
-### Maven information
-* Maven Repo (for folia-api):
-```xml
-<repository>
-    <id>papermc</id>
-    <url>https://repo.papermc.io/repository/maven-public/</url>
-</repository>
+monitor:
+  warn-enabled: true             # แจ้งเตือน op อัตโนมัติ
+  warn-tps-threshold: 14.0       # เตือนถ้า median TPS ต่ำกว่านี้
+  warn-ram-percent: 85           # เตือนถ้า RAM ใช้เกิน %
 ```
-* Artifact Information:
-```xml
-<dependency>
-    <groupId>dev.folia</groupId>
-    <artifactId>folia-api</artifactId>
-    <version>[26.1.2.build,)</version>
-    <scope>provided</scope>
-</dependency>
- ```
 
+---
 
-## License
-The PATCHES-LICENSE file describes the license for api & server patches,
-found in `./patches` and its subdirectories except when noted otherwise.
+## 🤖 เรื่อง AI ตรงไปตรงมา
 
-The fork is based off of PaperMC's fork example found [here](https://github.com/PaperMC/paperweight-examples).
-As such, it contains modifications to it in this project, please see the repository for license information
-of modified files.
+ผมขอพูดตรง ๆ เลย:
+
+> **ส่วนหนึ่งของโค้ดในโปรเจกต์นี้ถูกเขียน/ช่วยเขียนโดยเครื่องมือ AI**
+> แต่ผม **ตรวจทานโค้ดทุกบรรทัด** ก่อนที่จะ merge ทุกครั้ง — ทั้ง logic, thread safety,
+> ความเข้ากันได้กับ Folia และผลข้างเคียงกับปลั๊กอินเก่า แล้วยังเทสต์จริงบนเซิร์ฟเวอร์
+> ก่อนปล่อย build
+
+ผมไม่ได้เอาโค้ด AI มาใส่โดยไม่ดู ถ้าเจอจุดบกพร่องจากโค้ดที่ AI เขียน ผมแก้และบันทึกไว้
+**เอาโค้ดนี้ไปใช้ได้ แต่ถ้าจะเอาไปประยุกต์/ต่อยอด แนะนำให้อ่านผ่านก่อนนะครับ** 🙂
+
+---
+
+## 📦 วิธีติดตั้ง
+
+1. **สำรองไฟล์** ที่สำคัญของเซิร์ฟเวอร์เดิมก่อน (world, plugins, config) ⚠️
+2. ดาวน์โหลด build ล่าสุดจาก **Releases** (ไฟล์ `folia-paperclip-26.2-SNAPSHOT.jar`) แล้วเปลี่ยนชื่อเป็น `server.jar`
+3. วางในโฟลเดอร์เซิร์ฟเวอร์ แล้วเริ่มเครื่อง:
+
+```bash
+java -Xms2G -Xmx4G --nogui -jar server.jar
+```
+
+หรือถ้าใช้ Windows:
+
+```powershell
+java -Xms2G -Xmx4G -jar server.jar --nogui
+```
+
+4. เปิดครั้งแรกต้องรับข้อตกลง EULA (`eula.txt` → `eula=true`)
+5. รอขึ้นแล้ว — `sea.yml`, `bukkit.yml` และไฟล์คอนฟิกอื่นสร้างอัตโนมัติ
+6. วางปลั๊กอินลงใน `plugins/` เหมือนเดิม แล้ว restart
+
+---
+
+## 🛠️ Build จาก Source
+
+เตรียม: **JDK 21+** (build ทดสอบด้วย JDK 26), **Git**
+
+```powershell
+git clone <repository-url> AethraSea
+cd AethraSea
+
+# เอาค่อยๆ ใช้แพตช์ทั้งหมดลง source
+.\gradlew.bat applyAllPatches --no-configuration-cache
+
+# ลบ jar เก่า (กัน cache เก่า)
+Remove-Item folia-server\build\libs\*.jar
+
+# สร้าง paperclip jar
+.\gradlew.bat createPaperclipJar --no-configuration-cache
+```
+
+เสร็จแล้วได้ไฟล์ที่ `folia-server\build\libs\folia-paperclip-26.2-SNAPSHOT.jar`
+
+> 💡 เทคนิค: ห้ามรัน `rebuildPaperServerPatches` และ `applyAllPatches` ในคำสั่งเดียวกัน
+> (Gradle 9 ไม่ให้) — ต้องรันแยกกันเสมอ
+
+---
+
+## 📂 โครงสร้างแพตช์
+
+โปรเจกต์นี้เป็น Folia fork แบบ "patches-based" ตามสไตล์ Paper/Folia ดั้งเดิม:
+
+| ที่ | คืออะไร |
+| --- | --- |
+| `folia-server/minecraft-patches/features/` | แพตช์ระดับ Minecraft (network, config, threading) |
+| `folia-server/minecraft-patches/sources/` | โค้ดใหม่ทั้งหมดของ `dev.folia.sea.*` |
+| `folia-server/paper-patches/features/` | แพตช์ระดับ Paper (คำสั่ง, GUI registry) |
+
+โค้ดทั้งหมดของ AethraSea อยู่ในแพตช์ ซึ่งถูกคัดลอกเข้า source เวลารัน
+`applyAllPatches` — โค้ดใหม่ ๆ เขียนเป็นแพตช์เสมอ เพื่อให้ rebase กับ Folia ต้นทางง่าย
+
+---
+
+## 💬 ข้อควรรู้ก่อนอัปเกรด
+
+- 🐘 **ไม่ใช่ vanilla drop-in 100%** — universe อยู่บน Folia ควรเทสต์ปลั๊กอินที่ใช้จริงก่อน
+- 🔌 ปลั๊กอินที่เขียนด้วย **Folia API** จะทำงานแบบ best-in-class (region thread จริง)
+- 🔁 ถ้าเจอปัญหา ลอง `sea.yml` แล้ว `/seagui reload` ก่อน restart
+- 📝 เจอบั๊ก หรืออยากได้ฟีเจอร์ → เปิด **GitHub Issues** ได้เลย
+
+---
+
+## ⚖️ License
+
+AethraSea เป็น fork จาก **Paper / Folia** — ส่วนที่ได้จากต้นทางอยู่ภายใต้สัญญาอนุญาตของ
+Paper/Folia ตามที่ระบุในต้นทาง โปรดตรวจสอบ **LICENSE** ของต้นทางก่อนนำไปเผยแพร่
+หรือใช้เชิงพาณิชย์
+
+ส่วนโค้ดที่เขียนขึ้นใหม่โดย AethraSea ตั้งใจให้ทุกคนใช้และต่อยอดได้โดยไม่คิดค่าธรรมเนียม
+(ฟรี 100% ไม่มีค่าใช้จ่ายแฝง)
+
+---
+
+<div align="center">
+
+Made with 💙 and a lot of ☕ · *"obtmize แบบชิบหายทุกวินาที"*
+
+</div>

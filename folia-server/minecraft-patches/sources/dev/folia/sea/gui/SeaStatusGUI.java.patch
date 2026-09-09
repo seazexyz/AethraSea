@@ -7,7 +7,6 @@
 +import dev.folia.sea.io.SeaChunkIOPool;
 +import dev.folia.sea.network.SeaPacketEventPipeline;
 +import dev.folia.sea.pathfinding.SeaPathfindingPool;
-+import net.minecraft.server.MinecraftServer;
 +import org.bukkit.Bukkit;
 +import org.bukkit.ChatColor;
 +import org.bukkit.Material;
@@ -16,18 +15,19 @@
 +import org.bukkit.inventory.ItemStack;
 +import org.bukkit.inventory.meta.ItemMeta;
 +
-+import java.util.ArrayList;
 +import java.util.Arrays;
 +import java.util.List;
 +
 +public final class SeaStatusGUI {
 +
-+    public static final String GUI_TITLE = ChatColor.DARK_AQUA + "" + ChatColor.BOLD + "UniqueCraft " + ChatColor.DARK_GRAY + "» " + ChatColor.WHITE + "System Status";
++    public static final String GUI_TITLE = ChatColor.DARK_AQUA + "" + ChatColor.BOLD + "AethraSea " + ChatColor.DARK_GRAY + "» " + ChatColor.WHITE + "System Status";
 +
 +    private SeaStatusGUI() {}
 +
 +    public static void open(Player player) {
-+        Inventory inv = Bukkit.createInventory(player, 54, GUI_TITLE);
++        SeaGuiClickListener.ensureRegistered();
++
++        Inventory inv = Bukkit.createInventory(SeaGuiHolder.INSTANCE, 54, GUI_TITLE);
 +
 +        // Fill background with glass panes
 +        ItemStack grayGlass = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
@@ -52,7 +52,7 @@
 +
 +        inv.setItem(13, createItem(
 +                Material.NETHER_STAR,
-+                ChatColor.AQUA + "" + ChatColor.BOLD + "UniqueCraft Server Status",
++                ChatColor.AQUA + "" + ChatColor.BOLD + "AethraSea Server Status",
 +                ChatColor.GRAY + "• Brand Name: " + ChatColor.GOLD + SeaConfig.f3BrandName,
 +                ChatColor.GRAY + "• Server Name: " + ChatColor.WHITE + SeaConfig.serverName,
 +                ChatColor.GRAY + "• Minecraft Version: " + ChatColor.GREEN + Bukkit.getMinecraftVersion(),

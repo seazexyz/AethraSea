@@ -1,0 +1,161 @@
+--- /dev/null
++++ b/dev/folia/sea/gui/SeaEmbeddedPlugin.java
+@@ -1,0 +_,158 @@
++package dev.folia.sea.gui;
++
++import io.papermc.paper.plugin.configuration.PluginMeta;
++import io.papermc.paper.plugin.lifecycle.event.LifecycleEventManager;
++import io.papermc.paper.plugin.lifecycle.event.handler.configuration.LifecycleEventHandlerConfiguration;
++import org.bukkit.Bukkit;
++import org.bukkit.command.Command;
++import org.bukkit.command.CommandSender;
++import org.bukkit.configuration.file.YamlConfiguration;
++import org.bukkit.generator.BiomeProvider;
++import org.bukkit.generator.ChunkGenerator;
++import org.bukkit.plugin.Plugin;
++import org.bukkit.plugin.PluginDescriptionFile;
++import org.bukkit.plugin.PluginLoader;
++
++import java.io.File;
++import java.io.InputStream;
++import java.util.List;
++import java.util.logging.Logger;
++
++/**
++ * A minimal embedded {@link Plugin} token that exists only so the built-in AethraSea code can
++ * register Bukkit listeners (the inventory click guard for {@code /seagui}) without shipping an
++ * actual plugin jar. It is never enabled through the plugin loader; {@link #isEnabled()} simply
++ * returns {@code true} so {@link org.bukkit.plugin.RegisteredListener} dispatch treats it as a
++ * normal owning plugin.
++ */
++public final class SeaEmbeddedPlugin implements Plugin {
++
++    public static final SeaEmbeddedPlugin INSTANCE = new SeaEmbeddedPlugin();
++
++    private static final PluginDescriptionFile DESCRIPTION =
++        new PluginDescriptionFile("AethraSea", "26.2", SeaEmbeddedPlugin.class.getName());
++
++    private SeaEmbeddedPlugin() {
++    }
++
++    @Override
++    public File getDataFolder() {
++        return new File(Bukkit.getWorldContainer(), "plugins/AethraSea");
++    }
++
++    @Override
++    public PluginDescriptionFile getDescription() {
++        return DESCRIPTION;
++    }
++
++    @Override
++    public PluginMeta getPluginMeta() {
++        return DESCRIPTION;
++    }
++
++    @Override
++    public org.bukkit.configuration.file.FileConfiguration getConfig() {
++        return new YamlConfiguration();
++    }
++
++    @Override
++    public InputStream getResource(final String filename) {
++        return null;
++    }
++
++    @Override
++    public void saveConfig() {
++    }
++
++    @Override
++    public void saveDefaultConfig() {
++    }
++
++    @Override
++    public void saveResource(final String resourcePath, final boolean replace) {
++    }
++
++    @Override
++    public void reloadConfig() {
++    }
++
++    @Override
++    public PluginLoader getPluginLoader() {
++        return null;
++    }
++
++    @Override
++    public org.bukkit.Server getServer() {
++        return Bukkit.getServer();
++    }
++
++    @Override
++    public boolean isEnabled() {
++        return true;
++    }
++
++    @Override
++    public void onDisable() {
++    }
++
++    @Override
++    public void onLoad() {
++    }
++
++    @Override
++    public void onEnable() {
++    }
++
++    @Override
++    public boolean isNaggable() {
++        return false;
++    }
++
++    @Override
++    public void setNaggable(final boolean canNag) {
++    }
++
++    @Override
++    public ChunkGenerator getDefaultWorldGenerator(final String worldName, final String id) {
++        return null;
++    }
++
++    @Override
++    public BiomeProvider getDefaultBiomeProvider(final String worldName, final String id) {
++        return null;
++    }
++
++    @Override
++    public Logger getLogger() {
++        return Logger.getLogger("AethraSea");
++    }
++
++    @Override
++    public String getName() {
++        return "AethraSea";
++    }
++
++    @Override
++    public boolean onCommand(final CommandSender sender, final Command command, final String label, final String[] args) {
++        return false;
++    }
++
++    @Override
++    public List<String> onTabComplete(final CommandSender sender, final Command command, final String alias, final String[] args) {
++        return List.of();
++    }
++
++    @Override
++    public String namespace() {
++        return "aethrasea";
++    }
++
++    @Override
++    public LifecycleEventManager<Plugin> getLifecycleManager() {
++        return new LifecycleEventManager<>() {
++            @Override
++            public void registerEventHandler(final LifecycleEventHandlerConfiguration<? super Plugin> configuration) {
++            }
++        };
++    }
++}

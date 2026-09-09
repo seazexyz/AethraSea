@@ -16,7 +16,7 @@
 +public final class CommandTpsBar extends Command {
 +
 +    public CommandTpsBar() {
-+        super("tpsbar", "Toggles the real-time TPS/MSPT action bar", "/tpsbar [on|off]", Arrays.asList("tps-meter", "tpsmeter"));
++        super("tpsbar", "Toggles the real-time TPS/MSPT boss bar", "/tpsbar [on|off]", Arrays.asList("tps-meter", "tpsmeter"));
 +        this.setPermission(null);
 +    }
 +
