@@ -1,0 +1,334 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Wed, 9 Sep 2026 09:29:43 +0700
+Subject: [PATCH] AethraSea: bounded plugin lifecycle (no more hang at
+ Enabling), auto-relocate Folia plugins, scheduler fixes
+
+
+diff --git a/src/main/java/io/papermc/paper/PaperBootstrap.java b/src/main/java/io/papermc/paper/PaperBootstrap.java
+index dd3b70be83c24918f5a6f92acfcc9cde03109efe..a12422259affcc14dd469143a648d0cc6492471a 100644
+--- a/src/main/java/io/papermc/paper/PaperBootstrap.java
++++ b/src/main/java/io/papermc/paper/PaperBootstrap.java
+@@ -1,5 +1,6 @@
+ package io.papermc.paper;
+ 
++import java.util.ArrayList;
+ import java.util.List;
+ import joptsimple.OptionSet;
+ import net.minecraft.SharedConstants;
+@@ -10,6 +11,17 @@ import org.slf4j.LoggerFactory;
+ public final class PaperBootstrap {
+     private static final Logger LOGGER = LoggerFactory.getLogger("bootstrap");
+ 
++    // Optimize: กำหนดข้อความ Banner เป็น Array ไว้ล่วงหน้า ไม่ต้องเสียเวลาทำ .split("\n") ทุกครั้งที่เปิดเซิร์ฟ
++    private static final String[] BANNER_LINES = {
++        "§f  _  _ _____ _  _ ___    _   ___ ___  _   ",
++        "§7 /_\\| |_   _| || | _ \\  /_\\ / __| __|/_\\  ",
++        "§7/ _ \\ ' \\| | | __ |   / / _ \\\\__ \\ _|/ _ \\ ",
++        "§7/_/ \\_\\_||_|_| |_||_|_\\/_/ \\_\\___/___/_/ \\_\\",
++        "§7",
++        "§7   Folia region threading §8»§f legacy plugin compatibility",
++        "§7   Initializing AethraSea Hybrid Engine..."
++    };
++
+     private PaperBootstrap() {
+     }
+ 
+@@ -27,16 +39,7 @@ public final class PaperBootstrap {
+     }
+ 
+     private static void printBanner() {
+-        final String banner =
+-            "§f      _    ____  _   _  _____   ____    ____   _____  ____\n" +
+-            "§7     / \\  |  _ \\| | | ||_   _| / ___|  |  _ \\ / _ \\ \\| ___|\n" +
+-            "§7    / _ \\ | |_) | |_| |  | |   \\___ \\  | |_) ) |_| || |\n" +
+-            "§7   / ___ \\|  _ <|  _  |  | |    ___) | |  __/|  _  / | |\n" +
+-            "§7  /_/   \\_\\_| |_\\_| |_|  |_|   |____/  |_|   |_| \\_\\ |_|\n" +
+-            "§7\n" +
+-            "§7   Folia region threading §8»§f legacy plugin compatibility\n" +
+-            "§7   Initializing AethraSea Hybrid Engine...";
+-        for (final String line : banner.split("\n", -1)) {
++        for (final String line : BANNER_LINES) {
+             LOGGER.info(line);
+         }
+     }
+@@ -52,24 +55,27 @@ public final class PaperBootstrap {
+         final String osArch = System.getProperty("os.arch");
+ 
+         final ServerBuildInfo bi = ServerBuildInfo.buildInfo();
+-        return List.of(
+-            String.format(
+-                "Running Java %s (%s %s; %s %s) on %s %s (%s)",
+-                javaSpecVersion,
+-                javaVmName,
+-                javaVmVersion,
+-                javaVendor,
+-                javaVendorVersion,
+-                osName,
+-                osVersion,
+-                osArch
+-            ),
+-            String.format(
+-                "Loading %s %s for Minecraft %s",
+-                bi.brandName(),
+-                bi.asString(ServerBuildInfo.StringRepresentation.VERSION_FULL),
+-                bi.minecraftVersionId()
+-            )
+-        );
++
++        // Optimize: กำหนดขนาด Initial Capacity เป็น 2 ให้พอดีกับจำนวนข้อมูล ลด Memory Allocation
++        final List<String> messages = new ArrayList<>(2);
++        messages.add(String.format(
++            "Running Java %s (%s %s; %s %s) on %s %s (%s)",
++            javaSpecVersion,
++            javaVmName,
++            javaVmVersion,
++            javaVendor,
++            javaVendorVersion,
++            osName,
++            osVersion,
++            osArch
++        ));
++        messages.add(String.format(
++            "Loading %s %s for Minecraft %s",
++            bi.brandName(),
++            bi.asString(ServerBuildInfo.StringRepresentation.VERSION_FULL),
++            bi.minecraftVersionId()
++        ));
++
++        return messages;
+     }
+-}
++}
+\ No newline at end of file
+diff --git a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+index 9b34a6949af465f8b32d1c88d6e92c472b8f1c33..1131ebacfe7c6c5987e42ef5aee5944f464ada94 100644
+--- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
++++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+@@ -101,6 +101,15 @@ public class PluginInitializerManager {
+         io.papermc.paper.plugin.PluginInitializerManager pluginSystem = io.papermc.paper.plugin.PluginInitializerManager.init(optionSet);
+ 
+         // AethraSea Hybrid Engine start
++        //
++        // Auto-relocation: if a Folia-compatible plugin (plugin.yml declares folia-supported: true)
++        // was placed in the legacy zone (plugins/paper or the plugin dir root), move it into
++        // plugins/folia so it runs under the full region-threading model instead of the legacy
++        // virtual-main-thread shim. Doing this before scanning means the provider lands in the
++        // correct source classification from the very beginning.
++        relocateFoliaCompatiblePlugins(pluginSystem.pluginDirectoryPath().resolve("paper"));
++        relocateFoliaCompatiblePlugins(pluginSystem.pluginDirectoryPath());
++
+         // Legacy (single-threaded) sources: the plugin dir root (transition zone) and plugins/paper
+         io.papermc.paper.plugin.HybridPluginRuntime.inLegacySource(() ->
+             io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.pluginDirectoryPath())
+@@ -154,6 +163,74 @@ public class PluginInitializerManager {
+         }
+     }
+ 
++    // AethraSea Hybrid Engine start - auto-relocation of Folia-compatible plugins
++
++    /**
++     * Scans the given legacy plugin directory for plugin jars whose {@code plugin.yml} declares
++     * {@code folia-supported: true} (or references the Folia API) and moves them into
++     * {@code plugins/folia}. This ensures a Folia-aware plugin is never forced through the legacy
++     * single-threaded virtual-main-thread shim.
++     */
++    private static void relocateFoliaCompatiblePlugins(final Path legacyDir) {
++        if (legacyDir == null || !Files.isDirectory(legacyDir)) {
++            return;
++        }
++        final Path foliaDir = legacyDir.resolveSibling("folia");
++        try {
++            Files.createDirectories(foliaDir);
++        } catch (final IOException e) {
++            LOGGER.error("[AethraSea] Could not create plugins/folia directory for auto-relocation", e);
++            return;
++        }
++        try (java.util.stream.Stream<Path> jars = Files.list(legacyDir)) {
++            jars.filter(path -> path.getFileName().toString().toLowerCase(java.util.Locale.ENGLISH).endsWith(".jar"))
++                .forEach(jar -> relocateIfFoliaCompatible(jar, foliaDir));
++        } catch (final IOException e) {
++            LOGGER.warn("[AethraSea] Failed to scan {} for Folia-compatible plugins", legacyDir, e);
++        }
++    }
++
++    private static void relocateIfFoliaCompatible(final Path jar, final Path foliaDir) {
++        try (final java.util.jar.JarFile jarFile = new java.util.jar.JarFile(jar.toFile())) {
++            final java.util.jar.Manifest manifest = jarFile.getManifest();
++            if (manifest != null) {
++                final String foliaAttribute = manifest.getMainAttributes().getValue("Folia-Supported");
++                if (foliaAttribute != null && Boolean.parseBoolean(foliaAttribute)) {
++                    movePluginJar(jar, foliaDir);
++                    return;
++                }
++            }
++            final java.util.jar.JarEntry pluginYml = jarFile.getJarEntry("plugin.yml");
++            if (pluginYml == null) {
++                return;
++            }
++            final YamlConfiguration config = YamlConfiguration.loadConfiguration(
++                new java.io.BufferedReader(new java.io.InputStreamReader(jarFile.getInputStream(pluginYml), java.nio.charset.StandardCharsets.UTF_8))
++            );
++            if (config.getBoolean("folia-supported", false) || config.getBoolean("folia-supported.enabled", false)) {
++                movePluginJar(jar, foliaDir);
++            }
++        } catch (final IOException e) {
++            LOGGER.warn("[AethraSea] Could not inspect plugin jar {} for Folia compatibility", jar.getFileName(), e);
++        }
++    }
++
++    private static void movePluginJar(final Path jar, final Path foliaDir) {
++        final String fileName = jar.getFileName().toString();
++        final Path destination = foliaDir.resolve(fileName);
++        try {
++            if (Files.exists(destination)) {
++                Files.deleteIfExists(destination);
++            }
++            Files.move(jar, destination);
++            LOGGER.info("[AethraSea] Detected Folia-compatible plugin '{}' in the legacy plugins/ folder - auto-relocated to plugins/folia/.", fileName);
++        } catch (final IOException e) {
++            LOGGER.error("[AethraSea] Could not auto-relocate {} to {}: {}", fileName, destination, e.getMessage());
++        }
++    }
++
++    // AethraSea Hybrid Engine end - auto-relocation of Folia-compatible plugins
++
+     // This will be the end of me...
+     public static void reload(DedicatedServer dedicatedServer) {
+         // Wipe the provider storage
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+index 6cea14923795b3d1b15973c4b7e6a2a2b8ddc529..9a0acbdc3e9a5cc6a7ac6c5856e4586f7ccc2614 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+@@ -203,10 +203,21 @@ class PaperPluginInstanceManager {
+             try {
+                 // AethraSea Hybrid Engine - run a legacy plugin's onEnable() on the virtual main thread
+                 // so that Bukkit.isPrimaryThread() is true while it executes (single-threaded expectation).
++                // Use a bounded timeout to prevent a misbehaving plugin from freezing the server startup.
+                 final boolean legacy = io.papermc.paper.plugin.HybridPluginRuntime.isLegacyPlugin(jPlugin);
+                 final Runnable enableTask = () -> jPlugin.setEnabled(true);
+                 if (legacy) {
+-                    io.papermc.paper.threadedregions.PaperVirtualMainThread.execute(enableTask);
++                    try {
++                        io.papermc.paper.threadedregions.PaperVirtualMainThread.executeWithTimeout(enableTask,
++                            java.util.concurrent.TimeUnit.SECONDS.toNanos(30));
++                    } catch (java.util.concurrent.TimeoutException te) {
++                        this.server.getLogger().severe(String.format(
++                            "[%s] Plugin '%s' enable timed out after 30 seconds and was forcibly disabled. " +
++                                "It may be blocking inside onEnable() (e.g. callSyncMethod deadlock, long database connect, etc.).",
++                            plugin.getPluginMeta().getDisplayName(), plugin.getPluginMeta().getDisplayName()));
++                        this.server.getPluginManager().disablePlugin(jPlugin);
++                        return;
++                    }
+                 } else {
+                     enableTask.run();
+                 }
+@@ -253,9 +264,17 @@ class PaperPluginInstanceManager {
+             try {
+                 // AethraSea Hybrid Engine - run a legacy plugin's onDisable() on the virtual main thread
+                 // so that Bukkit.isPrimaryThread() is true while it executes (single-threaded expectation).
++                // Use a bounded timeout to prevent a misbehaving plugin from hanging the shutdown sequence.
+                 final Runnable disableTask = () -> javaPlugin.setEnabled(false);
+                 if (io.papermc.paper.plugin.HybridPluginRuntime.isLegacyPlugin(javaPlugin)) {
+-                    io.papermc.paper.threadedregions.PaperVirtualMainThread.execute(disableTask);
++                    try {
++                        io.papermc.paper.threadedregions.PaperVirtualMainThread.executeWithTimeout(disableTask,
++                            java.util.concurrent.TimeUnit.SECONDS.toNanos(15));
++                    } catch (java.util.concurrent.TimeoutException te) {
++                        this.server.getLogger().warning(String.format(
++                            "[%s] Plugin '%s' disable timed out after 15 seconds; proceeding with shutdown.",
++                            pluginName, pluginName));
++                    }
+                 } else {
+                     disableTask.run();
+                 }
+diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
+index 8ce8de8eedfe8557848b0508857744a5b9641239..9fafea5c4e7140aedb94f8ef6caaf4d396a12004 100644
+--- a/src/main/java/org/bukkit/craftbukkit/Main.java
++++ b/src/main/java/org/bukkit/craftbukkit/Main.java
+@@ -22,7 +22,14 @@ public class Main {
+     // Paper end - Reset loggers after shutdown
+ 
+     public static void main(String[] args) {
+-        if (System.getProperty("jdk.nio.maxCachedBufferSize") == null) System.setProperty("jdk.nio.maxCachedBufferSize", "262144"); // Paper - cap per-thread NIO cache size; https://www.evanjones.ca/java-bytebuffer-leak.html
++        // เปลี่ยนข้อความแจ้งเปิดระบบให้อยู่ในชื่อ AethraSea
++        System.out.println("Starting AethraSea Engine...");
++
++        // Optimize: Cap per-thread NIO cache size
++        if (System.getProperty("jdk.nio.maxCachedBufferSize") == null) {
++            System.setProperty("jdk.nio.maxCachedBufferSize", "262144");
++        }
++
+         OptionParser parser = new OptionParser() {
+             {
+                 this.acceptsAll(asList("?", "help"), "Show the help");
+@@ -164,7 +171,6 @@ public class Main {
+         } else if (options.has("v")) {
+             System.out.println(CraftServer.class.getPackage().getImplementationVersion());
+         } else {
+-            // Do you love Java using + and ! as string based identifiers? I sure do!
+             String path = new File(".").getAbsolutePath();
+             if (path.contains("!") || path.contains("+")) {
+                 System.err.println("Cannot run server in a directory with ! or + in the pathname. Please rename the affected folders and try again.");
+@@ -174,15 +180,18 @@ public class Main {
+             // Paper start - Improve java version check
+             boolean skip = Boolean.getBoolean("Paper.IgnoreJavaVersion");
+             String javaVersionName = System.getProperty("java.version");
+-            // J2SE SDK/JRE Version String Naming Convention
+             boolean isPreRelease = javaVersionName.contains("-");
+             if (isPreRelease) {
+                 if (!skip) {
+-                    System.err.println("Unsupported Java detected (" + javaVersionName + "). You are running an unsupported, non official, version. Only general availability versions of Java are supported. Please update your Java version. See https://docs.papermc.io/paper/faq#unsupported-java-detected-what-do-i-do for more information.");
++                    // Optimize: ใช้ StringBuilder ลด Memory Allocation ตอนเตือน Error
++                    StringBuilder sb = new StringBuilder(256);
++                    sb.append("Unsupported Java detected (").append(javaVersionName)
++                      .append("). You are running an unsupported, non official, version. Only general availability versions of Java are supported. Please update your Java version. See https://docs.papermc.io/paper/faq#unsupported-java-detected-what-do-i-do for more information.");
++                    System.err.println(sb.toString());
+                     return;
+                 }
+ 
+-                System.err.println("Unsupported Java detected ("+ javaVersionName + "), but the check was skipped. Proceed with caution! ");
++                System.err.println("Unsupported Java detected (" + javaVersionName + "), but the check was skipped. Proceed with caution! ");
+             }
+             // Paper end - Improve java version check
+ 
+@@ -207,4 +216,4 @@ public class Main {
+             }
+         }
+     }
+-}
++}
+\ No newline at end of file
+diff --git a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
+index 83ef76ff73ae8a663a3a301b5459e97e29458ae9..6c4b2bed9fd7993ea7a39a4563746220de5bc074 100644
+--- a/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
++++ b/src/main/java/org/bukkit/craftbukkit/scheduler/CraftScheduler.java
+@@ -526,6 +526,28 @@ public class CraftScheduler implements BukkitScheduler {
+         }
+         // Paper end
+         if (this.isAsyncScheduler || io.papermc.paper.threadedregions.PaperVirtualMainThread.isVirtualMainThread()) {
++            // AethraSea Hybrid Engine start - prevent nested deadlock: when already on the virtual
++            // main thread with a zero-delay sync task (the common callSyncMethod pattern), run it
++            // inline. Scheduling it would require mainThreadHeartbeat() to tick, but the heartbeat
++            // cannot advance while the current task (e.g. onEnable) is still executing.
++            if (!this.isAsyncScheduler && task.isSync() && delay == 0 && io.papermc.paper.threadedregions.PaperVirtualMainThread.isVirtualMainThread()) {
++                try {
++                    task.run();
++                } catch (final Throwable throwable) {
++                    final String logMessage = String.format(
++                        "Task #%s for %s generated an exception",
++                        task.getTaskId(),
++                        task.getOwner().getDescription().getFullName());
++                    task.getOwner().getLogger().log(
++                            Level.WARNING,
++                        logMessage,
++                            throwable);
++                    org.bukkit.Bukkit.getServer().getPluginManager().callEvent(
++                        new com.destroystokyo.paper.event.server.ServerExceptionEvent(new com.destroystokyo.paper.exception.ServerSchedulerException(logMessage, throwable, task)));
++                }
++                return task;
++            }
++            // AethraSea Hybrid Engine end - prevent nested deadlock
+             task.setNextRun(this.currentTick + delay);
+             this.addTask(task);
+             return task;

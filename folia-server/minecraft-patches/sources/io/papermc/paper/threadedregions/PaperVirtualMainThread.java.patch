@@ -1,10 +1,12 @@
 --- /dev/null
 +++ b/io/papermc/paper/threadedregions/PaperVirtualMainThread.java
-@@ -1,0 +_,128 @@
+@@ -1,0 +_,243 @@
 +package io.papermc.paper.threadedregions;
 +
 +import com.mojang.logging.LogUtils;
++import java.util.concurrent.CompletableFuture;
 +import java.util.concurrent.TimeUnit;
++import java.util.concurrent.TimeoutException;
 +import java.util.concurrent.atomic.AtomicBoolean;
 +import java.util.concurrent.locks.LockSupport;
 +import org.bukkit.Bukkit;
@@ -31,6 +33,7 @@
 +
 +    private static final MpscQueue<Runnable> QUEUE = MpscQueue.create();
 +    private static final AtomicBoolean STARTED = new AtomicBoolean();
++    private static volatile Thread VIRTUAL_THREAD;
 +
 +    private static final ThreadLocal<Boolean> ON_VIRTUAL_THREAD = ThreadLocal.withInitial(() -> Boolean.FALSE);
 +    private static final java.util.concurrent.atomic.AtomicLong TICK_COUNTER = new java.util.concurrent.atomic.AtomicLong();
@@ -44,6 +47,7 @@
 +        }
 +        final Thread thread = new Thread(PaperVirtualMainThread::runLoop, "Paper-Virtual-Main-Thread");
 +        thread.setDaemon(true);
++        VIRTUAL_THREAD = thread;
 +        thread.start();
 +    }
 +
@@ -55,6 +59,113 @@
 +        start();
 +        QUEUE.offer(runnable);
 +    }
++
++    /**
++     * Executes the given runnable synchronously on the virtual main thread, blocking the calling
++     * thread until it completes. If the current thread is already the virtual main thread the
++     * runnable executes inline.
++     *
++     * <p>This is the entry point used to run a legacy plugin's {@code onEnable()}/{@code onDisable()}
++     * lifecycle such that {@code Bukkit.isPrimaryThread()} reports {@code true} while it runs.</p>
++     */
++    public static void execute(final Runnable runnable) {
++        if (isVirtualMainThread()) {
++            runnable.run();
++            return;
++        }
++        start();
++        final java.util.concurrent.CompletableFuture<Void> gate = new java.util.concurrent.CompletableFuture<>();
++        QUEUE.offer(() -> {
++            try {
++                runnable.run();
++            } finally {
++                gate.complete(null);
++            }
++        });
++        gate.join();
++    }
++
++    /**
++     * Executes the given callable synchronously on the virtual main thread and returns its result,
++     * blocking the calling thread until it completes. If the current thread is already the virtual
++     * main thread the callable executes inline.
++     *
++     * <p>This is the entry point used by legacy (single-threaded) API paths that must both run on the
++     * simulated main thread and produce a value, e.g. {@code CraftServer#createWorld}.</p>
++     */
++    public static <T> T execute(final java.util.concurrent.Callable<T> callable) {
++        if (isVirtualMainThread()) {
++            try {
++                return callable.call();
++            } catch (final RuntimeException re) {
++                throw re;
++            } catch (final Exception e) {
++                throw new RuntimeException(e);
++            }
++        }
++        start();
++        final CompletableFuture<T> gate = new CompletableFuture<>();
++        QUEUE.offer(() -> {
++            try {
++                gate.complete(callable.call());
++            } catch (final Throwable throwable) {
++                gate.completeExceptionally(throwable);
++            }
++        });
++        return gate.join();
++    }
++
++    // AethraSea Hybrid Engine start - timeout-bounded execute to prevent startup hangs
++
++    /**
++     * Executes the given runnable synchronously on the virtual main thread with a bounded wait.
++     * If the runnable does not complete within {@code timeoutNanos}, the caller is unblocked and
++     * the virtual thread is interrupted. Used by the plugin lifecycle to prevent a misbehaving
++     * plugin's {@code onEnable()} from freezing the entire startup.
++     */
++    public static void executeWithTimeout(final Runnable runnable, final long timeoutNanos) throws TimeoutException {
++        if (isVirtualMainThread()) {
++            runnable.run();
++            return;
++        }
++        start();
++        final CompletableFuture<Void> gate = new CompletableFuture<>();
++        final java.util.concurrent.atomic.AtomicBoolean abandoned = new java.util.concurrent.atomic.AtomicBoolean(false);
++        QUEUE.offer(() -> {
++            try {
++                // If the caller gave up (timed out and already disabled the plugin), do not start
++                // the task late - that would enable a plugin we already tore down.
++                if (!abandoned.get()) {
++                    runnable.run();
++                }
++            } finally {
++                gate.complete(null);
++            }
++        });
++        try {
++            gate.get(timeoutNanos, TimeUnit.NANOSECONDS);
++        } catch (final TimeoutException e) {
++            abandoned.set(true);
++            // The task is still in the queue or stuck inside onEnable(). Interrupt the virtual
++            // main thread so it can unwind (interruptible I/O such as JDBC will throw), then
++            // propagate the timeout to the caller.
++            final Thread virtualThread = VIRTUAL_THREAD;
++            if (virtualThread != null) {
++                virtualThread.interrupt();
++            }
++            throw e;
++        } catch (final java.util.concurrent.ExecutionException e) {
++            final Throwable cause = e.getCause();
++            if (cause instanceof RuntimeException rte) throw rte;
++            if (cause instanceof Error err) throw err;
++            throw new RuntimeException(cause);
++        } catch (final InterruptedException e) {
++            Thread.currentThread().interrupt();
++            throw new RuntimeException(e);
++        }
++    }
++
++    // AethraSea Hybrid Engine end - timeout-bounded execute
 +
 +    public static boolean isVirtualMainThread() {
 +        return ON_VIRTUAL_THREAD.get();
@@ -91,6 +202,10 @@
 +                // keep draining without sleeping while there was work
 +                continue;
 +            }
++
++            // AethraSea Hybrid Engine - clear any interrupt left by a lifecycle timeout so the
++            // park below can actually sleep (LockSupport.park is interruptible but does not throw).
++            Thread.interrupted();
 +
 +            LockSupport.parkNanos(nextTickTime - now);
 +        }

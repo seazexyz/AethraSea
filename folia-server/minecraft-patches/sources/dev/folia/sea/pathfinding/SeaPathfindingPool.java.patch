@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/dev/folia/sea/pathfinding/SeaPathfindingPool.java
-@@ -1,0 +_,103 @@
+@@ -1,0 +_,106 @@
 +package dev.folia.sea.pathfinding;
 +
 +import com.mojang.logging.LogUtils;
@@ -20,9 +20,12 @@
 +    private static final AtomicLong TOTAL_PATHS_CALCULATED = new AtomicLong(0);
 +    private static final AtomicLong TOTAL_CALC_TIME_NANOS = new AtomicLong(0);
 +
++    // AethraSea Hybrid Engine - honor SeaConfig.pathfindingThreads (core/max) instead of hardcoding
++    private static final int PATHFINDING_THREADS = Math.max(1, SeaConfig.pathfindingThreads);
++
 +    private static final ThreadPoolExecutor PATHFINDING_EXECUTOR = new ThreadPoolExecutor(
-+            2,
-+            Math.max(4, Runtime.getRuntime().availableProcessors()),
++            PATHFINDING_THREADS,
++            PATHFINDING_THREADS,
 +            30L,
 +            TimeUnit.SECONDS,
 +            new LinkedBlockingQueue<>(2048),
