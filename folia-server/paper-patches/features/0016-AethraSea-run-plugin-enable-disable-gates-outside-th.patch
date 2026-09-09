@@ -1,0 +1,119 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Wed, 9 Sep 2026 10:11:30 +0700
+Subject: [PATCH] AethraSea: run plugin enable/disable gates outside the
+ manager monitor (fix self-disable-in-onEnable deadlock)
+
+
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+index 9a0acbdc3e9a5cc6a7ac6c5856e4586f7ccc2614..c67274d8d7dbaf9dc588dcb24ef2aefcd8cd75f1 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+@@ -172,16 +172,23 @@ class PaperPluginInstanceManager {
+         }
+     }
+ 
+-    public synchronized void enablePlugin(@NotNull Plugin plugin) {
+-        if (plugin.isEnabled()) {
+-            return;
+-        }
++    public void enablePlugin(@NotNull Plugin plugin) {
++        // AethraSea Hybrid Engine - the enable gate must NOT run while holding this monitor:
++        // a legacy plugin that re-enters the PluginManager from its own onEnable() (e.g. calling
++        // disablePlugin() on itself) would otherwise deadlock waiting on the very monitor this
++        // thread is parked on while awaiting the virtual main thread. State-touching fragments
++        // below are guarded individually instead.
++        synchronized (this) {
++            if (plugin.isEnabled()) {
++                return;
++            }
+ 
+-        if (plugin.getPluginMeta() instanceof PluginDescriptionFile) {
+-            List<Command> bukkitCommands = PluginCommandYamlParser.parse(plugin);
++            if (plugin.getPluginMeta() instanceof PluginDescriptionFile) {
++                List<Command> bukkitCommands = PluginCommandYamlParser.parse(plugin);
+ 
+-            if (!bukkitCommands.isEmpty()) {
+-                this.commandMap.registerAll(plugin.getPluginMeta().getName(), bukkitCommands);
++                if (!bukkitCommands.isEmpty()) {
++                    this.commandMap.registerAll(plugin.getPluginMeta().getName(), bukkitCommands);
++                }
+             }
+         }
+ 
+@@ -194,11 +201,13 @@ class PaperPluginInstanceManager {
+ 
+             JavaPlugin jPlugin = (JavaPlugin) plugin;
+ 
+-            if (jPlugin.getClass().getClassLoader() instanceof ConfiguredPluginClassLoader classLoader) { // Paper
+-                if (PaperClassLoaderStorage.instance().registerUnsafePlugin(classLoader)) {
+-                    this.server.getLogger().log(Level.WARNING, "Enabled plugin with unregistered ConfiguredPluginClassLoader " + plugin.getPluginMeta().getDisplayName());
+-                }
+-            } // Paper
++            synchronized (this) { // Paper
++                if (jPlugin.getClass().getClassLoader() instanceof ConfiguredPluginClassLoader classLoader) {
++                    if (PaperClassLoaderStorage.instance().registerUnsafePlugin(classLoader)) {
++                        this.server.getLogger().log(Level.WARNING, "Enabled plugin with unregistered ConfiguredPluginClassLoader " + plugin.getPluginMeta().getDisplayName());
++                    }
++                } // Paper
++            }
+ 
+             try {
+                 // AethraSea Hybrid Engine - run a legacy plugin's onEnable() on the virtual main thread
+@@ -244,15 +253,21 @@ class PaperPluginInstanceManager {
+                 + plugin.getPluginMeta().getDisplayName() + " (Is it up to date?)", ex, plugin);
+         }
+ 
+-        HandlerList.bakeAll();
++        synchronized (this) {
++            HandlerList.bakeAll();
++        }
+     }
+ 
+-    public synchronized void disablePlugin(@NotNull Plugin plugin) {
+-        if (!(plugin instanceof JavaPlugin javaPlugin)) {
+-            throw new IllegalArgumentException("Only expects java plugins.");
+-        }
+-        if (!plugin.isEnabled()) {
+-            return;
++    public void disablePlugin(@NotNull Plugin plugin) {
++        // AethraSea Hybrid Engine - like enablePlugin, the disable gate runs OUTSIDE the monitor so a
++        // plugin re-entering the manager (enable/disable from within its own lifecycle) cannot deadlock.
++        synchronized (this) {
++            if (!(plugin instanceof JavaPlugin javaPlugin)) {
++                throw new IllegalArgumentException("Only expects java plugins.");
++            }
++            if (!plugin.isEnabled()) {
++                return;
++            }
+         }
+ 
+         String pluginName = plugin.getPluginMeta().getDisplayName();
+@@ -291,16 +306,18 @@ class PaperPluginInstanceManager {
+             // tries to print after its source has unloaded (i.e., Guice enhanced errors)
+             FeatureHooks.flushAsyncAppenders();
+ 
+-            ClassLoader classLoader = plugin.getClass().getClassLoader();
+-            if (classLoader instanceof ConfiguredPluginClassLoader configuredPluginClassLoader) {
+-                try {
+-                    configuredPluginClassLoader.close();
+-                } catch (IOException ex) {
+-                    this.server.getLogger().log(Level.WARNING, "Error closing the classloader for '" + pluginName + "'", ex); // Paper - log exception
++            synchronized (this) {
++                ClassLoader classLoader = plugin.getClass().getClassLoader();
++                if (classLoader instanceof ConfiguredPluginClassLoader configuredPluginClassLoader) {
++                    try {
++                        configuredPluginClassLoader.close();
++                    } catch (IOException ex) {
++                        this.server.getLogger().log(Level.WARNING, "Error closing the classloader for '" + pluginName + "'", ex); // Paper - log exception
++                    }
++                    // Remove from the classloader pool inorder to prevent plugins from trying
++                    // to access classes
++                    PaperClassLoaderStorage.instance().unregisterClassloader(configuredPluginClassLoader);
+                 }
+-                // Remove from the classloader pool inorder to prevent plugins from trying
+-                // to access classes
+-                PaperClassLoaderStorage.instance().unregisterClassloader(configuredPluginClassLoader);
+             }
+ 
+         } catch (Throwable ex) {

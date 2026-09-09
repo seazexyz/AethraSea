@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Builder <builder@folia.local>
+Date: Wed, 9 Sep 2026 10:23:57 +0700
+Subject: [PATCH] AethraSea: fix javaPlugin variable scoping in disablePlugin
+ guard
+
+
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+index c67274d8d7dbaf9dc588dcb24ef2aefcd8cd75f1..e5f7f0755cbf4384180982080af6308eda586102 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
+@@ -261,10 +261,12 @@ class PaperPluginInstanceManager {
+     public void disablePlugin(@NotNull Plugin plugin) {
+         // AethraSea Hybrid Engine - like enablePlugin, the disable gate runs OUTSIDE the monitor so a
+         // plugin re-entering the manager (enable/disable from within its own lifecycle) cannot deadlock.
++        final JavaPlugin javaPlugin;
+         synchronized (this) {
+-            if (!(plugin instanceof JavaPlugin javaPlugin)) {
++            if (!(plugin instanceof JavaPlugin javaPluginCast)) {
+                 throw new IllegalArgumentException("Only expects java plugins.");
+             }
++            javaPlugin = javaPluginCast;
+             if (!plugin.isEnabled()) {
+                 return;
+             }
