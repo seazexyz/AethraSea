@@ -97,7 +97,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
             
             <!-- Logo & Brand -->
-            <a href="#home" onclick="navigate('home')" class="flex items-center gap-2.5 font-semibold text-sm">
+            <a href="https://seazexyz.github.io/AethraSea#home" onclick="navigate('home')" class="flex items-center gap-2.5 font-semibold text-sm">
                 <div class="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400">
                     <i class="fa-solid fa-water text-xs"></i>
                 </div>
@@ -142,7 +142,7 @@
     <main class="flex-grow">
         
         <!-- ================================================================= -->
-        <!-- VIEW 1: HOME PAGE (seadomine.com) -->
+        <!-- VIEW 1: HOME PAGE (https://seazexyz.github.io/AethraSea) -->
         <!-- ================================================================= -->
         <div id="view-home" class="blur-gradient">
             
@@ -283,7 +283,7 @@ network:
 
 
         <!-- ================================================================= -->
-        <!-- VIEW 2: DOWNLOAD PAGE (seadomine.com/download) -->
+        <!-- VIEW 2: DOWNLOAD PAGE (https://seazexyz.github.io/AethraSea#download) -->
         <!-- ================================================================= -->
         <div id="view-download" class="hidden py-12 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="space-y-3 mb-8">
@@ -301,12 +301,12 @@ network:
                 <!-- Main Release Card -->
                 <div class="p-6 rounded-xl bg-dark-card border border-subtle space-y-5">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-brand-400 font-mono">STABLE RELEASE</span>
+                        <span class="text-xs font-semibold text-brand-400 font-mono">SNAPSHOT RELEASE</span>
                         <span class="text-[11px] text-slate-500 font-mono">Folia 26.2 Base</span>
                     </div>
 
                     <div>
-                        <h3 class="text-base font-bold text-white">aethrasea-paperclip-26.2.jar</h3>
+                        <h3 class="text-base font-bold text-white">AethraSea-26.2-SNAPSHOT.jar</h3>
                         <p class="text-xs text-slate-400 mt-1">Full distribution jar containing patched server core and libraries.</p>
                     </div>
 
@@ -351,7 +351,7 @@ network:
 
 
         <!-- ================================================================= -->
-        <!-- VIEW 3: DOCUMENTATION PAGE (seadomine.com/docs) -->
+        <!-- VIEW 3: DOCUMENTATION PAGE (https://seazexyz.github.io/AethraSea#docs) -->
         <!-- ================================================================= -->
         <div id="view-docs" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div class="grid lg:grid-cols-12 gap-8 items-start">
@@ -419,11 +419,11 @@ network:
                             </ul>
 
                             <h3 class="text-sm font-bold text-white mt-6">First Launch</h3>
-                            <p>Place <code class="text-brand-400 code-font">aethrasea-paperclip-26.2.jar</code> into an empty directory and execute:</p>
+                            <p>Place <code class="text-brand-400 code-font">AethraSea-26.2-SNAPSHOT.jar</code> into an empty directory and execute:</p>
                             
                             <div class="p-3 bg-slate-950 rounded border border-subtle code-font text-slate-200 flex justify-between items-center">
-                                <code>java -Xms4G -Xmx4G -jar aethrasea-paperclip-26.2.jar --nogui</code>
-                                <button onclick="copyToClipboard('java -Xms4G -Xmx4G -jar aethrasea-paperclip-26.2.jar --nogui')" class="text-slate-400 hover:text-white"><i class="fa-regular fa-copy"></i></button>
+                                <code>java -Xms4G -Xmx4G -jar AethraSea-26.2-SNAPSHOT.jar --nogui</code>
+                                <button onclick="copyToClipboard('java -Xms4G -Xmx4G -jar AethraSea-26.2-SNAPSHOT.jar --nogui')" class="text-slate-400 hover:text-white"><i class="fa-regular fa-copy"></i></button>
                             </div>
 
                             <p>On initial boot, AethraSea will automatically extract libraries and generate the <code class="text-brand-400 code-font">sea.yml</code> configuration file.</p>
@@ -516,8 +516,8 @@ security:
                         <div class="space-y-3 text-xs text-slate-300">
                             <p>For high-concurrency regionized workloads with G1GC or ZGC, use the following startup flags:</p>
                             <div class="p-3 bg-slate-950 rounded border border-subtle code-font text-slate-200 overflow-x-auto flex justify-between items-center gap-2">
-                                <code class="text-[11px]">java -Xms8G -Xmx8G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -jar aethrasea-paperclip-26.2.jar --nogui</code>
-                                <button onclick="copyToClipboard('java -Xms8G -Xmx8G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -jar aethrasea-paperclip-26.2.jar --nogui')" class="text-slate-400 hover:text-white shrink-0"><i class="fa-regular fa-copy"></i></button>
+                                <code class="text-[11px]">java -Xms8G -Xmx8G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -jar AethraSea-26.2-SNAPSHOT.jar --nogui</code>
+                                <button onclick="copyToClipboard('java -Xms8G -Xmx8G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=20 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -jar AethraSea-26.2-SNAPSHOT.jar --nogui')" class="text-slate-400 hover:text-white shrink-0"><i class="fa-regular fa-copy"></i></button>
                             </div>
                         </div>
                     </div>
@@ -661,7 +661,7 @@ security:
                 <div class="w-5 h-5 rounded bg-brand-500/10 border border-brand-500/30 flex items-center justify-center text-brand-400 text-[10px]">
                     <i class="fa-solid fa-water"></i>
                 </div>
-                <span>AethraSea Engine (seadomine.com)</span>
+                <span>AethraSea Engine (seazexyz.github.io/AethraSea)</span>
             </div>
             <div>
                 <span>GPL-3.0 License · Folia 26.2 Fork</span>
