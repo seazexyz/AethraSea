@@ -7,22 +7,37 @@ on:
 
 jobs:
   build:
-    # Only run on PRs if the source branch is on someone else's repo
     if: ${{ github.event_name != 'pull_request' || github.repository != github.event.pull_request.head.repo.full_name }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Git Repository
         uses: actions/checkout@v6
+
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '25'
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+
       - name: Configure Git User Details
-        run: git config --global user.email "actions@github.com" && git config --global user.name "Github Actions"
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "Github Actions"
+
       - name: Apply Patches
         run: ./gradlew applyAllPatches --stacktrace
-      - name: Build
+
+      - name: Build Server & Paperclip
         run: ./gradlew build -x test
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AethraSea-Server-Jars
+          path: |
+            folia-server/build/libs/*.jar
+            build/libs/*.jar
+          if-no-files-found: warn
