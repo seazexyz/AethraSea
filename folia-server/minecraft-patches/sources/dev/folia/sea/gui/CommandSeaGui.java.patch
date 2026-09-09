@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/dev/folia/sea/gui/CommandSeaGui.java
-@@ -1,0 +_,68 @@
+@@ -1,0 +_,70 @@
 +package dev.folia.sea.gui;
 +
 +import dev.folia.sea.config.SeaConfig;
@@ -36,6 +36,7 @@
 +
 +        if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
 +            SeaConfig.loadConfig();
++            SeaConfig.applyChunkSystemSettings();
 +            sender.sendMessage(ChatColor.GREEN + "[SeaConfig] sea.yml configuration reloaded successfully!");
 +            return true;
 +        }
@@ -50,6 +51,7 @@
 +        sender.sendMessage(ChatColor.GRAY + "• Brand: " + ChatColor.GOLD + SeaConfig.f3BrandName);
 +        sender.sendMessage(ChatColor.GRAY + "• Online: " + ChatColor.GREEN + Bukkit.getOnlinePlayers().size() + "/" + Bukkit.getMaxPlayers());
 +        sender.sendMessage(ChatColor.GRAY + "• Async Chunk I/O: " + (SeaConfig.asyncChunkIo ? ChatColor.GREEN + "ENABLED (" + SeaChunkIOPool.getTotalTasksProcessed() + " tasks)" : ChatColor.RED + "DISABLED"));
++        sender.sendMessage(ChatColor.GRAY + "• Parallel Chunk Loading: " + (SeaConfig.parallelChunkLoading ? ChatColor.GREEN + "PARALLEL (" + (SeaConfig.chunkLoadingParallelism > 0 ? SeaConfig.chunkLoadingParallelism + " workers)" : "auto workers)") : ChatColor.RED + "SERIAL (1 worker)"));
 +        sender.sendMessage(ChatColor.GRAY + "• Async Pathfinding: " + (SeaConfig.asyncPathfinding ? ChatColor.GREEN + "ENABLED (" + SeaPathfindingPool.getTotalPathsCalculated() + " paths, " + String.format("%.2f µs avg", SeaPathfindingPool.getAverageCalcTimeMicros()) + ")" : ChatColor.RED + "DISABLED"));
 +        sender.sendMessage(ChatColor.GRAY + "• Smart Region Merging: " + (SeaConfig.smartRegionMerging ? ChatColor.GREEN + "ENABLED (" + SeaConfig.regionMergeHysteresisTicks + " ticks)" : ChatColor.RED + "DISABLED"));
 +        sender.sendMessage(ChatColor.GRAY + "• Stasis Chamber Fix: " + (SeaConfig.stasisChamberFix ? ChatColor.GREEN + "ENABLED" : ChatColor.RED + "DISABLED"));

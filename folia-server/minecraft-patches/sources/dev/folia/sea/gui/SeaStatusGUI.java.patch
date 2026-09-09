@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/dev/folia/sea/gui/SeaStatusGUI.java
-@@ -1,0 +_,145 @@
+@@ -1,0 +_,147 @@
 +package dev.folia.sea.gui;
 +
 +import dev.folia.sea.config.SeaConfig;
@@ -75,6 +75,8 @@
 +                Material.ANVIL,
 +                ChatColor.GOLD + "" + ChatColor.BOLD + "Async Chunk I/O Pipeline",
 +                ChatColor.GRAY + "• Status: " + (SeaConfig.asyncChunkIo ? ChatColor.GREEN + "ENABLED (Background Daemon)" : ChatColor.RED + "DISABLED"),
++                ChatColor.GRAY + "• Parallel Chunk Loading: " + (SeaConfig.parallelChunkLoading ? ChatColor.GREEN + "PARALLEL (" + (SeaConfig.chunkLoadingParallelism > 0 ? SeaConfig.chunkLoadingParallelism + " workers)" : "auto workers)") : ChatColor.RED + "SERIAL (1 worker)"),
++                ChatColor.GRAY + "• Chunk I/O Threads: " + ChatColor.WHITE + (SeaConfig.chunkIoThreads > 0 ? SeaConfig.chunkIoThreads + " threads" : "auto"),
 +                ChatColor.GRAY + "• Active I/O Threads: " + ChatColor.WHITE + SeaChunkIOPool.getActiveThreads() + " threads",
 +                ChatColor.GRAY + "• Total I/O Tasks Processed: " + ChatColor.YELLOW + SeaChunkIOPool.getTotalTasksProcessed(),
 +                ChatColor.GRAY + "• Queued Disk Operations: " + ChatColor.WHITE + SeaChunkIOPool.getQueueSize()

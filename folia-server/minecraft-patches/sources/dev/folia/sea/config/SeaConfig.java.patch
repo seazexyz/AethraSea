@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/dev/folia/sea/config/SeaConfig.java
-@@ -1,0 +_,177 @@
+@@ -1,0 +_,207 @@
 +package dev.folia.sea.config;
 +
 +import com.mojang.logging.LogUtils;
@@ -28,6 +28,9 @@
 +    public static boolean asyncChunkIo = true;
 +    public static boolean asyncPathfinding = true;
 +    public static int pathfindingThreads = 4;
++    public static boolean parallelChunkLoading = true;
++    public static int chunkLoadingParallelism = 0;
++    public static int chunkIoThreads = 0;
 +
 +    // Gameplay settings
 +    public static boolean stasisChamberFix = true;
@@ -63,6 +66,18 @@
 +            createDefaultConfig();
 +        }
 +        loadConfig();
++        applyChunkSystemSettings();
++    }
++
++    public static void applyChunkSystemSettings() {
++        io.papermc.paper.configuration.GlobalConfiguration.get();
++        if (parallelChunkLoading) {
++            ca.spottedleaf.moonrise.common.util.MoonriseCommon.adjustWorkerThreads(chunkLoadingParallelism, chunkIoThreads);
++        } else {
++            ca.spottedleaf.moonrise.common.util.MoonriseCommon.adjustWorkerThreads(1, 1);
++        }
++        LOGGER.info("[SeaConfig] Parallel chunk loading: {} | chunk loading parallelism: {} (0=auto) | chunk I/O threads: {} (0=auto)",
++                parallelChunkLoading ? "ENABLED" : "DISABLED", chunkLoadingParallelism, chunkIoThreads);
 +    }
 +
 +    private static void createDefaultConfig() {
@@ -74,6 +89,14 @@
 +            #   performance.async-chunk-io           - load/generate chunks on worker threads
 +            #   performance.async-pathfinding        - run mob path-finding on dedicated threads
 +            #   performance.pathfinding-threads      - number of path-finding worker threads
++            #   performance.chunk-system.parallel-chunk-loading
++            #                                    - true: Moonrise parallel chunk load/gen
++            #                                      (worker threads control parallelism)
++            #                                      false: forces 1 worker + 1 I/O thread (serial)
++            #   performance.chunk-system.chunk-loading-parallelism
++            #                                    - parallel chunk load/gen worker threads (0=auto cores/2)
++            #   performance.chunk-system.chunk-io-threads
++            #                                    - chunk disk I/O threads (0=auto)
 +            #   network.packet-flood-limiter         - drop + kick clients exceeding max-packets-per-second
 +            #   network.max-packets-per-second       - packet flood threshold per connection
 +            #   network.async-packet-events          - route packets through the async event pipeline
@@ -90,6 +113,10 @@
 +              async-chunk-io: true
 +              async-pathfinding: true
 +              pathfinding-threads: 4
++              chunk-system:
++                parallel-chunk-loading: true
++                chunk-loading-parallelism: 0
++                chunk-io-threads: 0
 +              monitor-warning:
 +                enabled: true
 +                tps-threshold: 18.0
@@ -139,6 +166,9 @@
 +            asyncChunkIo = config.getBoolean("performance.async-chunk-io", true);
 +            asyncPathfinding = config.getBoolean("performance.async-pathfinding", true);
 +            pathfindingThreads = config.getInt("performance.pathfinding-threads", Math.max(2, Runtime.getRuntime().availableProcessors() / 2));
++            parallelChunkLoading = config.getBoolean("performance.chunk-system.parallel-chunk-loading", true);
++            chunkLoadingParallelism = config.getInt("performance.chunk-system.chunk-loading-parallelism", 0);
++            chunkIoThreads = config.getInt("performance.chunk-system.chunk-io-threads", 0);
 +
 +            // Performance monitor
 +            monitorWarnEnabled = config.getBoolean("performance.monitor-warning.enabled", true);
